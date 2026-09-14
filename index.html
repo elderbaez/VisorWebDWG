@@ -132,7 +132,6 @@
     </script>
 
     <script type="module">
-        // Exponer THREE globalmente (dxf-viewer lo requiere)
         import * as THREE from 'three';
         window.THREE = THREE;
 
@@ -242,11 +241,12 @@
                 const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
                 const dxfUrl = URL.createObjectURL(dxfBlob);
 
-                // 🔤 FUENTE TTF DIRECTA Y FIABLE (Google Fonts → jsDelivr)
+                // 🔤 FUENTE LOCAL (en el repositorio)
+                //    Ruta relativa: /fonts/Roboto-Regular.ttf
                 await viewer.Load({
                     url: dxfUrl,
                     fonts: [
-                        'https://cdn.jsdelivr.net/gh/google/fonts@master/apache/roboto/Roboto-Regular.ttf'
+                        'fonts/Roboto-Regular.ttf'
                     ]
                 });
 
