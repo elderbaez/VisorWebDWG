@@ -543,6 +543,9 @@ body {
             <button class="snap-btn active" data-snap="center" title="Centro">
               <svg viewBox="0 0 24 24" stroke-width="2" fill="none"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
             </button>
+            <button class="snap-btn active" data-snap="quadrant" title="Cuadrante">
+              <svg viewBox="0 0 24 24" stroke-width="2" fill="none"><circle cx="12" cy="12" r="8"/><line x1="12" y1="4" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="20"/><line x1="4" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="20" y2="12"/></svg>
+            </button>
             <button class="snap-btn active" data-snap="nearest" title="Cercano">
               <svg viewBox="0 0 24 24" stroke-width="2" fill="none"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="12" cy="12" r="3" fill="currentColor"/><line x1="12" y1="9" x2="12" y2="15"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
             </button>
@@ -744,11 +747,12 @@ const MAX_HISTORY = 60;
 
 let measureTool = 'distance';
 let measurePoints = [];
-let measureSnaps = new Set(['endpoint', 'midpoint', 'center', 'nearest', 'intersection', 'perpendicular', 'fictitious']);
+let measureSnaps = new Set(['endpoint', 'midpoint', 'center', 'quadrant', 'nearest', 'intersection', 'perpendicular', 'fictitious']);
 let lastSnapPoint = null;
 let mouseScreen = { x: 0, y: 0 };
 let rawDxfText = '';
 let measureRedrawRAF = null;
+let snapPoints = []; // Puntos de snap precalculados
 
 function fmtBytes(b) {
   if (b < 1024) return b + ' B';
@@ -1034,30 +1038,43 @@ function fitView() {
   setTimeout(() => drawMeasurePreview(), 50);
 }
 
-function dispatchZoom(deltaY) {
-  const canvas = viewer?.GetCanvas?.();
-  if (!canvas) return;
+/* Zoom directo usando camera.zoom para cámaras ortográficas */
+function zoomAtScreenPoint(factor, clientX, clientY) {
+  if (!viewer) return;
+  const camera = viewer.GetCamera();
+  const controls = viewer.controls;
+  if (!camera || !controls) return;
+  const canvas = viewer.GetCanvas();
   const rect = canvas.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-  try {
-    const evt = new WheelEvent('wheel', {
-      deltaY, deltaMode: 0, clientX: cx, clientY: cy,
-      bubbles: true, cancelable: true,
-    });
-    canvas.dispatchEvent(evt);
-  } catch (e) {
-    try {
-      const evt = new MouseEvent('wheel', { clientX: cx, clientY: cy, bubbles: true, cancelable: true });
-      Object.defineProperty(evt, 'deltaY', { value: deltaY });
-      Object.defineProperty(evt, 'deltaMode', { value: 0 });
-      canvas.dispatchEvent(evt);
-    } catch (e2) {}
-  }
-  setTimeout(() => drawMeasurePreview(), 30);
+  const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
+  const zoomPoint = new THREE.Vector3(ndcX, ndcY, 1).unproject(camera);
+  const oldZoom = camera.zoom;
+  const newZoom = Math.max(0.0001, Math.min(100000, oldZoom * factor));
+  camera.zoom = newZoom;
+  const camPos = camera.position;
+  const dx = zoomPoint.x - camPos.x;
+  const dy = zoomPoint.y - camPos.y;
+  const scale = 1 - oldZoom / newZoom;
+  camPos.x += dx * scale;
+  camPos.y += dy * scale;
+  controls.target.x += dx * scale;
+  controls.target.y += dy * scale;
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
+  controls.update();
+  viewer.Render();
+  requestAnimationFrame(() => drawMeasurePreview());
 }
-function zoomIn() { dispatchZoom(-240); }
-function zoomOut() { dispatchZoom(240); }
+
+function zoomIn() {
+  const rect = DOM.viewerContainer.getBoundingClientRect();
+  zoomAtScreenPoint(1.25, rect.left + rect.width / 2, rect.top + rect.height / 2);
+}
+function zoomOut() {
+  const rect = DOM.viewerContainer.getBoundingClientRect();
+  zoomAtScreenPoint(0.8, rect.left + rect.width / 2, rect.top + rect.height / 2);
+}
 
 DOM.btnFit.addEventListener('click', () => { if (!DOM.btnFit.disabled) fitView(); });
 DOM.btnZoomIn.addEventListener('click', () => { if (!DOM.btnZoomIn.disabled) zoomIn(); });
@@ -1083,14 +1100,10 @@ DOM.viewerContainer.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
   const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-  const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-  const hit = new THREE.Vector3();
-  if (!raycaster.ray.intersectPlane(plane, hit)) return;
+  const v = new THREE.Vector3(ndcX, ndcY, 1).unproject(camera);
   DOM.statusCoords.style.display = '';
-  DOM.statusX.textContent = `X: ${fmtNum(hit.x + origin.x)} m`;
-  DOM.statusY.textContent = `Y: ${fmtNum(hit.y + origin.y)} m`;
+  DOM.statusX.textContent = `X: ${fmtNum(v.x + origin.x)} m`;
+  DOM.statusY.textContent = `Y: ${fmtNum(v.y + origin.y)} m`;
 });
 DOM.viewerContainer.addEventListener('mouseleave', () => {
   DOM.statusCoords.style.display = 'none';
@@ -1193,148 +1206,236 @@ function pickLayerAtPoint(clientX, clientY, threshold = 14) {
   return bestLayer;
 }
 
-function projectWorldToScreen(x, y, z, camera, rect) {
-  const v = new THREE.Vector3(x, y, z);
+function projectWorldToScreen(x, y, camera, canvasRect) {
+  const origin = viewer.GetOrigin();
+  const v = new THREE.Vector3(x - origin.x, y - origin.y, 0);
   v.project(camera);
-  return { x: (v.x + 1) * 0.5 * rect.width, y: (-v.y + 1) * 0.5 * rect.height, behind: v.z > 1 };
+  return { x: (v.x + 1) * 0.5 * canvasRect.width, y: (-v.y + 1) * 0.5 * canvasRect.height };
 }
 
-function projectScreenToWorld(clientX, clientY, camera, canvas, origin) {
+function projectScreenToWorld(clientX, clientY) {
+  const camera = viewer.GetCamera();
+  const canvas = viewer.GetCanvas();
+  const origin = viewer.GetOrigin();
+  if (!camera || !canvas || !origin) return null;
   const rect = canvas.getBoundingClientRect();
   const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
   const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-  const ray = new THREE.Raycaster();
-  ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-  const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-  const hit = new THREE.Vector3();
-  if (!ray.ray.intersectPlane(plane, hit)) return null;
-  return { x: hit.x + origin.x, y: hit.y + origin.y, z: 0 };
+  const v = new THREE.Vector3(ndcX, ndcY, 1).unproject(camera);
+  return { x: v.x + origin.x, y: v.y + origin.y, z: 0 };
 }
 
+/* ============================================================
+   PUNTOS DE SNAP EXTRAÍDOS DEL DXF (precalculados)
+============================================================ */
+function buildSnapPointsFromDxf(dxfText) {
+  const entities = parseDxfLines(dxfText);
+  const points = [];
+  const seen = new Set();
+  const addPoint = (x, y, type) => {
+    if (!isFinite(x) || !isFinite(y)) return;
+    const key = `${Math.round(x * 1000)}_${Math.round(y * 1000)}_${type}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    points.push({ x, y, type });
+  };
+  for (const ent of entities) {
+    const v = ent.values, type = ent.type;
+    if (type === 'LINE') {
+      const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
+      const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
+      if (isFinite(x1) && isFinite(y1)) addPoint(x1, y1, 'endpoint');
+      if (isFinite(x2) && isFinite(y2)) addPoint(x2, y2, 'endpoint');
+      if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) {
+        addPoint((x1 + x2) / 2, (y1 + y2) / 2, 'midpoint');
+      }
+    } else if (type === 'LWPOLYLINE' || type === 'POLYLINE') {
+      const xs = [], ys = [];
+      for (const key in v) {
+        if (key === '10') {
+          const x = parseFloat(v[key]); const y = parseFloat(v['20']);
+          if (isFinite(x) && isFinite(y)) { xs.push(x); ys.push(y); }
+        }
+      }
+      for (let k = 0; k < xs.length; k++) {
+        addPoint(xs[k], ys[k], 'endpoint');
+        if (k < xs.length - 1) addPoint((xs[k] + xs[k+1]) / 2, (ys[k] + ys[k+1]) / 2, 'midpoint');
+      }
+    } else if (type === 'CIRCLE') {
+      const cx = parseFloat(v['10']), cy = parseFloat(v['20']), r = parseFloat(v['40']);
+      if (isFinite(cx) && isFinite(cy)) {
+        addPoint(cx, cy, 'center');
+        if (isFinite(r)) {
+          addPoint(cx + r, cy, 'quadrant'); addPoint(cx - r, cy, 'quadrant');
+          addPoint(cx, cy + r, 'quadrant'); addPoint(cx, cy - r, 'quadrant');
+        }
+      }
+    } else if (type === 'ARC') {
+      const cx = parseFloat(v['10']), cy = parseFloat(v['20']), r = parseFloat(v['40']);
+      const sa = parseFloat(v['50'] || '0'), ea = parseFloat(v['51'] || '360');
+      if (isFinite(cx) && isFinite(cy)) {
+        addPoint(cx, cy, 'center');
+        if (isFinite(r)) {
+          const a1 = sa * Math.PI / 180, a2 = ea * Math.PI / 180;
+          addPoint(cx + r * Math.cos(a1), cy + r * Math.sin(a1), 'endpoint');
+          addPoint(cx + r * Math.cos(a2), cy + r * Math.sin(a2), 'endpoint');
+          const am = (a1 + a2) / 2;
+          addPoint(cx + r * Math.cos(am), cy + r * Math.sin(am), 'midpoint');
+        }
+      }
+    } else if (type === 'POINT') {
+      const x = parseFloat(v['10']), y = parseFloat(v['20']);
+      if (isFinite(x) && isFinite(y)) addPoint(x, y, 'endpoint');
+    }
+  }
+  return points;
+}
+
+/* ============================================================
+   SNAPPING USANDO PUNTOS PRECALCULADOS
+============================================================ */
 function findSnapPoint(clientX, clientY, threshold = 14) {
-  if (!viewer) return null;
-  const scene = viewer.GetScene();
+  if (!viewer || snapPoints.length === 0) return null;
   const camera = viewer.GetCamera();
   const canvas = viewer.GetCanvas();
-  if (!scene || !camera || !canvas) return null;
-  try { scene.updateMatrixWorld(true); } catch (e) {}
+  if (!camera || !canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  const clickX = clientX - rect.left;
+  const clickY = clientY - rect.top;
+  const thresh2 = threshold * threshold;
+
+  let best = null, bestDist2 = thresh2;
+
+  for (const pt of snapPoints) {
+    let tipoActivo = false;
+    switch (pt.type) {
+      case 'endpoint': tipoActivo = measureSnaps.has('endpoint'); break;
+      case 'midpoint': tipoActivo = measureSnaps.has('midpoint'); break;
+      case 'center': tipoActivo = measureSnaps.has('center'); break;
+      case 'quadrant': tipoActivo = measureSnaps.has('quadrant'); break;
+      default: tipoActivo = measureSnaps.has('nearest');
+    }
+    if (!tipoActivo) continue;
+    const sp = projectWorldToScreen(pt.x, pt.y, camera, rect);
+    const dx = sp.x - clickX, dy = sp.y - clickY;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestDist2) {
+      bestDist2 = d2;
+      best = { x: pt.x, y: pt.y, z: 0, screenX: sp.x, screenY: sp.y, type: pt.type };
+    }
+  }
+
+  // Snap "nearest": punto sobre segmento más cercano
+  if (measureSnaps.has('nearest') && !best) {
+    const nearest = findNearestOnSegments(clientX, clientY, threshold);
+    if (nearest) best = nearest;
+  }
+  // Intersecciones
+  if (measureSnaps.has('intersection') && !best) {
+    const ix = findIntersectionNear(clientX, clientY, threshold);
+    if (ix) best = ix;
+  }
+  // Intersección ficticia
+  if (measureSnaps.has('fictitious') && !best) {
+    const fx = findFictitiousIntersection(clientX, clientY, threshold);
+    if (fx) best = fx;
+  }
+  return best;
+}
+
+function findNearestOnSegments(clientX, clientY, threshold) {
+  const camera = viewer.GetCamera();
+  const canvas = viewer.GetCanvas();
   const rect = canvas.getBoundingClientRect();
   const clickX = clientX - rect.left, clickY = clientY - rect.top;
-  const thresh2 = threshold * threshold;
-  let best = null, bestDist2 = thresh2;
-  const halfW = rect.width * 0.5, halfH = rect.height * 0.5;
-  const v = new THREE.Vector3();
-  const MAX_SAMPLES = 8000;
-  const allSegments = [];
-  const consider = (x, y, z, type) => {
-    const p = projectWorldToScreen(x, y, 0, camera, rect);
-    if (p.behind) return;
-    const dx = p.x - clickX, dy = p.y - clickY;
-    const d2 = dx * dx + dy * dy;
-    if (d2 < bestDist2) { bestDist2 = d2; best = { x, y, z: 0, screenX: p.x, screenY: p.y, type }; }
-  };
-  const visit = (obj) => {
-    if (!obj) return;
-    let anc = obj, visible = true;
-    while (anc && anc !== scene) { if (anc.visible === false) { visible = false; break; } anc = anc.parent; }
-    if (!visible) return;
-    const geom = obj.geometry;
-    const pos = geom && geom.attributes && geom.attributes.position;
-    if (pos && pos.count > 0) {
-      const m = obj.matrixWorld;
-      const count = pos.count;
-      const toWorld = (i) => { v.fromBufferAttribute(pos, i); v.applyMatrix4(m); return { x: v.x, y: v.y, z: 0 }; };
-      if (obj.isLineSegments) {
-        const segCount = Math.floor(count / 2);
-        const segStep = Math.max(1, Math.ceil(segCount / MAX_SAMPLES));
-        for (let s = 0; s < segCount; s += segStep) {
-          const a = toWorld(s * 2), b = toWorld(s * 2 + 1);
-          allSegments.push({ a, b });
-          if (measureSnaps.has('endpoint')) { consider(a.x, a.y, 0, 'endpoint'); consider(b.x, b.y, 0, 'endpoint'); }
-          if (measureSnaps.has('midpoint')) consider((a.x + b.x) / 2, (a.y + b.y) / 2, 0, 'midpoint');
-          if (measureSnaps.has('nearest')) {
-            const pa = projectWorldToScreen(a.x, a.y, 0, camera, rect);
-            const pb = projectWorldToScreen(b.x, b.y, 0, camera, rect);
-            if (!pa.behind && !pb.behind) {
-              const dx = pb.x - pa.x, dy = pb.y - pa.y;
-              const lenSq = dx * dx + dy * dy;
-              let t = lenSq > 1e-9 ? ((clickX - pa.x) * dx + (clickY - pa.y) * dy) / lenSq : 0;
-              t = Math.max(0, Math.min(1, t));
-              const sx = pa.x + t * dx, sy = pa.y + t * dy;
-              const d2b = (clickX - sx) ** 2 + (clickY - sy) ** 2;
-              if (d2b < bestDist2) { bestDist2 = d2b; best = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y), z: 0, screenX: sx, screenY: sy, type: 'nearest' }; }
-            }
-          }
-        }
-      } else if (obj.isLine) {
-        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
-        let prev = null;
-        for (let i = 0; i < count; i += vStep) {
-          const p = toWorld(i);
-          if (measureSnaps.has('endpoint')) consider(p.x, p.y, 0, 'endpoint');
-          if (prev) {
-            allSegments.push({ a: prev, b: p });
-            if (measureSnaps.has('midpoint')) consider((prev.x + p.x) / 2, (prev.y + p.y) / 2, 0, 'midpoint');
-          }
-          prev = p;
-        }
-      } else if (obj.isPoints) {
-        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
-        for (let i = 0; i < count; i += vStep) {
-          const p = toWorld(i);
-          if (measureSnaps.has('endpoint')) consider(p.x, p.y, 0, 'endpoint');
-        }
-      } else {
-        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
-        for (let i = 0; i < count; i += vStep) {
-          const p = toWorld(i);
-          if (measureSnaps.has('endpoint')) consider(p.x, p.y, 0, 'endpoint');
-        }
-        if (measureSnaps.has('center')) {
-          const box = new THREE.Box3().setFromObject(obj);
-          const c = box.getCenter(new THREE.Vector3());
-          consider(c.x, c.y, 0, 'center');
-        }
-      }
-    }
-    if (obj.children) for (const c of obj.children) visit(c);
-  };
-  for (const c of scene.children) visit(c);
-
-  if (measureSnaps.has('intersection') && allSegments.length > 0) {
-    const MAX_PAIRS = 400;
-    let pairs = 0;
-    for (let i = 0; i < allSegments.length && pairs < MAX_PAIRS; i++) {
-      for (let j = i + 1; j < allSegments.length && pairs < MAX_PAIRS; j++) {
-        pairs++;
-        const ix = segIntersectWorld(allSegments[i].a, allSegments[i].b, allSegments[j].a, allSegments[j].b);
-        if (ix) {
-          const p = projectWorldToScreen(ix.x, ix.y, 0, camera, rect);
-          if (p.behind) continue;
-          const d2 = (p.x - clickX) ** 2 + (p.y - clickY) ** 2;
-          if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: p.x, screenY: p.y, type: 'intersection' }; }
-        }
+  let best = null, bestDist2 = threshold * threshold;
+  const entities = parseDxfLines(rawDxfText);
+  for (const ent of entities) {
+    const v = ent.values;
+    if (ent.type === 'LINE') {
+      const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
+      const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
+      if (!isFinite(x1) || !isFinite(x2)) continue;
+      const p1 = projectWorldToScreen(x1, y1, camera, rect);
+      const p2 = projectWorldToScreen(x2, y2, camera, rect);
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const lenSq = dx * dx + dy * dy;
+      let t = lenSq > 1e-9 ? ((clickX - p1.x) * dx + (clickY - p1.y) * dy) / lenSq : 0;
+      t = Math.max(0, Math.min(1, t));
+      const sx = p1.x + t * dx, sy = p1.y + t * dy;
+      const d2 = (clickX - sx) ** 2 + (clickY - sy) ** 2;
+      if (d2 < bestDist2) {
+        bestDist2 = d2;
+        best = { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1), z: 0, screenX: sx, screenY: sy, type: 'nearest' };
       }
     }
   }
+  return best;
+}
 
-  if (measureSnaps.has('fictitious') && allSegments.length > 0 && !best) {
-    const MAX_PAIRS = 300;
-    let pairs = 0;
-    for (let i = 0; i < allSegments.length && pairs < MAX_PAIRS; i++) {
-      for (let j = i + 1; j < allSegments.length && pairs < MAX_PAIRS; j++) {
-        pairs++;
-        const ix = segIntersectExtended(allSegments[i].a, allSegments[i].b, allSegments[j].a, allSegments[j].b);
-        if (ix) {
-          const p = projectWorldToScreen(ix.x, ix.y, 0, camera, rect);
-          if (p.behind) continue;
-          const d2 = (p.x - clickX) ** 2 + (p.y - clickY) ** 2;
-          if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: p.x, screenY: p.y, type: 'fictitious' }; }
-        }
+function findIntersectionNear(clientX, clientY, threshold) {
+  const camera = viewer.GetCamera();
+  const canvas = viewer.GetCanvas();
+  const rect = canvas.getBoundingClientRect();
+  const clickX = clientX - rect.left, clickY = clientY - rect.top;
+  const entities = parseDxfLines(rawDxfText);
+  const lines = [];
+  for (const ent of entities) {
+    const v = ent.values;
+    if (ent.type === 'LINE') {
+      const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
+      const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
+      if (isFinite(x1) && isFinite(x2)) lines.push({ x1, y1, x2, y2 });
+    }
+  }
+  let best = null, bestDist2 = threshold * threshold;
+  for (let i = 0; i < lines.length; i++) {
+    for (let j = i + 1; j < lines.length; j++) {
+      const a = lines[i], b = lines[j];
+      const ix = segIntersectWorld({ x: a.x1, y: a.y1 }, { x: a.x2, y: a.y2 }, { x: b.x1, y: b.y1 }, { x: b.x2, y: b.y2 });
+      if (ix) {
+        const sp = projectWorldToScreen(ix.x, ix.y, camera, rect);
+        const d2 = (sp.x - clickX) ** 2 + (sp.y - clickY) ** 2;
+        if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: sp.x, screenY: sp.y, type: 'intersection' }; }
       }
     }
   }
+  return best;
+}
 
+function findFictitiousIntersection(clientX, clientY, threshold) {
+  const camera = viewer.GetCamera();
+  const canvas = viewer.GetCanvas();
+  const rect = canvas.getBoundingClientRect();
+  const clickX = clientX - rect.left, clickY = clientY - rect.top;
+  const entities = parseDxfLines(rawDxfText);
+  const lines = [];
+  for (const ent of entities) {
+    const v = ent.values;
+    if (ent.type === 'LINE') {
+      const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
+      const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
+      if (isFinite(x1) && isFinite(x2)) lines.push({ x1, y1, x2, y2 });
+    }
+  }
+  let best = null, bestDist2 = threshold * threshold;
+  const margin = 2.0;
+  for (let i = 0; i < lines.length; i++) {
+    for (let j = i + 1; j < lines.length; j++) {
+      const a = lines[i], b = lines[j];
+      const d1x = a.x2 - a.x1, d1y = a.y2 - a.y1;
+      const d2x = b.x2 - b.x1, d2y = b.y2 - b.y1;
+      const denom = d1x * d2y - d1y * d2x;
+      if (Math.abs(denom) < 1e-12) continue;
+      const t = ((b.x1 - a.x1) * d2y - (b.y1 - a.y1) * d2x) / denom;
+      const u = ((b.x1 - a.x1) * d1y - (b.y1 - a.y1) * d1x) / denom;
+      if (t < -margin || t > 1 + margin || u < -margin || u > 1 + margin) continue;
+      const ix = { x: a.x1 + t * d1x, y: a.y1 + t * d1y };
+      const sp = projectWorldToScreen(ix.x, ix.y, camera, rect);
+      const d2 = (sp.x - clickX) ** 2 + (sp.y - clickY) ** 2;
+      if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: sp.x, screenY: sp.y, type: 'fictitious' }; }
+    }
+  }
   return best;
 }
 
@@ -1349,18 +1450,9 @@ function segIntersectWorld(a1, a2, b1, b2) {
   return { x: a1.x + t * d1x, y: a1.y + t * d1y };
 }
 
-function segIntersectExtended(a1, a2, b1, b2) {
-  const d1x = a2.x - a1.x, d1y = a2.y - a1.y;
-  const d2x = b2.x - b1.x, d2y = b2.y - b1.y;
-  const denom = d1x * d2y - d1y * d2x;
-  if (Math.abs(denom) < 1e-12) return null;
-  const t = ((b1.x - a1.x) * d2y - (b1.y - a1.y) * d2x) / denom;
-  const u = ((b1.x - a1.x) * d1y - (b1.y - a1.y) * d1x) / denom;
-  const margin = 2.0;
-  if (t < -margin || t > 1 + margin || u < -margin || u > 1 + margin) return null;
-  return { x: a1.x + t * d1x, y: a1.y + t * d1y };
-}
-
+/* ============================================================
+   OVERLAY DE MEDICIÓN
+============================================================ */
 function getOverlayCtx() {
   const c = DOM.measureOverlay;
   const rect = DOM.canvasContainer.getBoundingClientRect();
@@ -1488,9 +1580,7 @@ DOM.viewerContainer.addEventListener('click', (e) => {
   let worldPoint, screenX, screenY;
   if (snap) { worldPoint = { x: snap.x, y: snap.y, z: 0 }; screenX = snap.screenX; screenY = snap.screenY; }
   else {
-    const camera = viewer.GetCamera(), canvas = viewer.GetCanvas(), origin = viewer.GetOrigin();
-    if (!camera || !canvas || !origin) return;
-    const wp = projectScreenToWorld(e.clientX, e.clientY, camera, canvas, origin);
+    const wp = projectScreenToWorld(e.clientX, e.clientY);
     if (!wp) return;
     worldPoint = wp;
     const cRect = DOM.canvasContainer.getBoundingClientRect();
@@ -1547,9 +1637,7 @@ function updateMeasureResultLive() {
   let curPoint = null;
   if (lastSnapPoint) curPoint = { x: lastSnapPoint.x, y: lastSnapPoint.y, z: 0 };
   else {
-    const camera = viewer.GetCamera(), canvas = viewer.GetCanvas(), origin = viewer.GetOrigin();
-    if (!camera || !canvas || !origin) return;
-    curPoint = projectScreenToWorld(mouseScreen.x, mouseScreen.y, camera, canvas, origin);
+    curPoint = projectScreenToWorld(mouseScreen.x, mouseScreen.y);
     if (!curPoint) return;
   }
   if (measureTool === 'distance' && n === 1) {
@@ -1688,15 +1776,13 @@ async function getJsPDF() {
   });
 }
 
+/* Importación dinámica de svg2pdf.js como módulo ESM */
+let svg2pdfFn = null;
 async function getSvg2Pdf() {
-  if (window.svg2pdf) return window.svg2pdf;
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.1/dist/svg2pdf.umd.min.js';
-    s.onload = () => { if (window.svg2pdf) resolve(window.svg2pdf); else reject(new Error('svg2pdf no cargó')); };
-    s.onerror = () => reject(new Error('No se pudo descargar svg2pdf'));
-    document.head.appendChild(s);
-  });
+  if (svg2pdfFn) return svg2pdfFn;
+  const mod = await import('https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.1/dist/svg2pdf.esm.min.js');
+  svg2pdfFn = mod.default || mod.svg2pdf || mod;
+  return svg2pdfFn;
 }
 
 function parseDxfLines(dxfText) {
@@ -1785,7 +1871,7 @@ async function generatePdfVectorial(regionRect) {
   if (!rawDxfText) { notificar('No hay datos DXF cargados', 'error'); return; }
   try {
     const jsPDF = await getJsPDF();
-    const Svg2Pdf = await getSvg2Pdf();
+    const svg2pdf = await getSvg2Pdf();
     const entities = parseDxfLines(rawDxfText);
     let vectorLines = extractVectorLines(entities);
     if (vectorLines.length === 0) { notificar('No se encontraron líneas', 'warn'); return; }
@@ -1828,7 +1914,7 @@ async function generatePdfVectorial(regionRect) {
     const svgElement = svgDoc.documentElement;
 
     const pdf = new jsPDF({ orientation: svgW > svgH ? 'landscape' : 'portrait', unit: 'pt', format: [svgW, svgH] });
-    await Svg2Pdf(svgElement, pdf);
+    await svg2pdf(svgElement, pdf);
     pdf.save(buildPdfName(regionRect ? 'area' : 'vista'));
     notificar('PDF generado');
   } catch (e) {
@@ -1892,6 +1978,7 @@ async function processFile(file) {
       dxfText = await file.text();
     }
     rawDxfText = dxfText;
+    snapPoints = buildSnapPointsFromDxf(dxfText);
 
     DOM.loadingLabel.textContent = 'Cargando tipografías…';
     fonts = await getFonts();
