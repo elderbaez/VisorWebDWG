@@ -23,41 +23,57 @@
   --radius-sm: 6px; --radius-md: 10px;
   --shadow: 0 8px 24px rgba(0,0,0,0.5);
   --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Altura de app: JS la actualiza. Fallback inicial 100vh. */
+  --app-height: 100vh;
 }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body {
+
+html {
   height: 100%;
-  height: 100vh;
-  height: 100dvh;
-  width: 100%;
+  overflow: hidden;
   overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
+
 body {
-  font-family: var(--font); background-color: var(--bg); color: var(--text-main);
+  font-family: var(--font);
+  background-color: var(--bg);
+  color: var(--text-main);
+  height: 100%;
+  width: 100%;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  position: fixed;
+  inset: 0;
 }
+
 .side-panel::-webkit-scrollbar { width: 6px; }
 .side-panel::-webkit-scrollbar-track { background: transparent; }
 .side-panel::-webkit-scrollbar-thumb { background: rgba(139,148,158,0.28); border-radius: 3px; }
 
 #pantalla-visor {
-  display: flex; flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  width: 100vw;
-  background: var(--bg); position: relative;
+  display: flex;
+  flex-direction: column;
+  height: var(--app-height);
+  width: 100%;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
 }
 
 .viewer-top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0.75rem 1.25rem; background: var(--panel); border-bottom: 1px solid var(--border);
-  z-index: 50; flex-shrink: 0;
+  padding: 0.75rem 1.25rem;
   padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  padding-left: calc(1.25rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1.25rem + env(safe-area-inset-right, 0px));
+  background: var(--panel); border-bottom: 1px solid var(--border);
+  z-index: 50; flex-shrink: 0;
 }
 .app-title { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; color: var(--text-main); }
 .app-logo-svg { width: 22px; height: 22px; fill: var(--accent); }
@@ -70,6 +86,7 @@ body {
   font-weight: 600; font-size: 0.8rem; cursor: pointer;
   border: 1px solid var(--border); background: var(--panel-card);
   color: var(--text-secondary); transition: var(--transition); font-family: var(--font);
+  -webkit-tap-highlight-color: transparent;
 }
 .btn:hover:not(:disabled) { background: var(--border); color: var(--text-main); border-color: var(--border-hover); }
 .btn svg { width: 15px; height: 15px; }
@@ -108,12 +125,13 @@ body {
 .btn-sidebar-toggle:hover { background: var(--border); }
 .btn-sidebar-toggle svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
 
-.viewer-body { flex: 1; display: flex; position: relative; overflow: hidden; }
+.viewer-body { flex: 1; display: flex; position: relative; overflow: hidden; min-height: 0; }
 
 .side-panel {
   width: 300px; background: var(--panel); border-right: 1px solid var(--border);
   padding: 1.25rem 1rem; overflow-y: auto; flex-shrink: 0; z-index: 40;
   transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1), transform 0.22s;
+  -webkit-overflow-scrolling: touch;
 }
 .side-panel.colapsado { margin-left: -300px; }
 
@@ -175,15 +193,16 @@ body {
   padding: 1rem 0.5rem; line-height: 1.5; font-weight: 500;
 }
 
-.main-area { flex: 1; display: flex; overflow: hidden; position: relative; }
+.main-area { flex: 1; display: flex; overflow: hidden; position: relative; min-width: 0; min-height: 0; }
 .canvas-container {
   flex: 1; position: relative; background: #0d1117;
   overflow: hidden; min-width: 0; min-height: 0;
 }
-#viewer-container { width: 100%; height: 100%; position: absolute; inset: 0; }
+#viewer-container { width: 100%; height: 100%; position: absolute; inset: 0; touch-action: none; }
 
 #measure-overlay {
   position: absolute; inset: 0; pointer-events: none; z-index: 8;
+  touch-action: none;
 }
 
 .selection-rect {
@@ -196,6 +215,7 @@ body {
 .measure-panel {
   position: absolute; top: 1rem; left: 50%; transform: translateX(-50%);
   background: rgba(22, 27, 34, 0.92); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--border); border-radius: 12px;
   box-shadow: var(--shadow); z-index: 300;
   display: none; flex-direction: column;
@@ -302,7 +322,6 @@ body {
 .measure-history::-webkit-scrollbar-thumb {
   background: rgba(139,148,158,0.30);
   border-radius: 2px;
-  transition: background 0.18s;
 }
 .measure-history::-webkit-scrollbar-thumb:hover { background: rgba(139,148,158,0.55); }
 .measure-hist-item {
@@ -347,7 +366,9 @@ body {
 .drag-overlay {
   position: absolute; inset: 0; z-index: 100; display: none;
   align-items: center; justify-content: center; flex-direction: column; gap: 0.75rem;
-  background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(8px);
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 2px dashed var(--accent);
   color: var(--text-main); font-weight: 700; font-size: 0.95rem;
   pointer-events: none;
@@ -358,7 +379,9 @@ body {
 .loading-overlay {
   position: absolute; inset: 0; z-index: 90; display: none;
   align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
-  background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(6px);
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 .loading-overlay.activo { display: flex; }
 .spinner {
@@ -374,8 +397,6 @@ body {
 .canvas-container.mode-clickhide #viewer-container { cursor: crosshair; }
 .canvas-container.mode-pdfarea #viewer-container { cursor: crosshair; }
 .canvas-container.mode-measure #viewer-container { cursor: crosshair; }
-.canvas-container.mode-pan #viewer-container { cursor: grab; }
-.canvas-container.mode-pan #viewer-container:active { cursor: grabbing; }
 
 .info-fab {
   position: absolute; bottom: 1rem; right: 1rem;
@@ -423,14 +444,16 @@ body {
 .info-link.whatsapp .info-link-label small { color: #25D366; opacity: 0.85; }
 
 .viewer-status-bar {
-  height: auto;
-  min-height: 34px;
-  background: var(--panel); border-top: 1px solid var(--border);
+  background: var(--panel);
+  border-top: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 1rem;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding: 0.35rem 1rem;
+  padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1rem + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px));
   font-size: 0.72rem; font-weight: 500;
   color: var(--text-secondary); z-index: 50; flex-shrink: 0;
+  min-height: 34px;
 }
 .status-left { display: flex; gap: 1.5rem; align-items: center; overflow: hidden; min-width: 0; }
 .status-left span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -443,6 +466,7 @@ body {
   display: flex; align-items: center; gap: 5px;
   transition: var(--transition); font-weight: 600; font-family: var(--font);
   font-size: 0.72rem; position: relative;
+  -webkit-tap-highlight-color: transparent;
 }
 .cad-tool-btn:hover:not(:disabled) { background: var(--border); color: var(--text-main); }
 .cad-tool-btn:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -462,20 +486,13 @@ body {
   border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 700;
   z-index: 9999; box-shadow: var(--shadow);
   animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: calc(100vw - 2rem);
+  text-align: center;
 }
 .notificacion.error { background: var(--danger); }
 .notificacion.warn { background: var(--warning); color: #1a1a1a; }
 @keyframes slideUp { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
-/* Touch: deshabilitar gestos nativos del navegador sobre el canvas */
-#viewer-container, #measure-overlay {
-  touch-action: none;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Aumentar el área táctil de los botones en móvil */
 @media (hover: none) and (pointer: coarse) {
   .cad-tool-btn { min-height: 34px; padding: 6px 10px; }
   .btn { min-height: 38px; }
@@ -483,6 +500,7 @@ body {
   .layer-item input[type="checkbox"] { width: 18px; height: 18px; }
   .snap-btn { width: 38px; height: 38px; }
   .measure-tool-btn { padding: 0.55rem 0.85rem; }
+  .measure-close { width: 32px; height: 32px; font-size: 1.3rem; }
 }
 
 @media (max-width: 900px) {
@@ -492,19 +510,39 @@ body {
     box-shadow: 6px 0 20px rgba(0,0,0,0.55);
     transform: translateX(0); margin-left: 0;
     width: 280px;
+    padding-left: calc(1rem + env(safe-area-inset-left, 0px));
   }
   .side-panel.colapsado { transform: translateX(-100%); margin-left: 0; }
-  .viewer-top-bar { padding: 0.55rem 0.75rem; gap: 0.4rem; padding-top: calc(0.55rem + env(safe-area-inset-top, 0px)); }
+  .viewer-top-bar {
+    padding: 0.55rem 0.75rem;
+    padding-top: calc(0.55rem + env(safe-area-inset-top, 0px));
+    padding-left: calc(0.75rem + env(safe-area-inset-left, 0px));
+    padding-right: calc(0.75rem + env(safe-area-inset-right, 0px));
+    gap: 0.4rem;
+  }
   .app-title { font-size: 0.9rem; gap: 0.4rem; }
   .app-subtitle { display: none; }
   .btn span.btn-label { display: none; }
   .btn { padding: 0.45rem 0.6rem; }
   .viewer-actions { gap: 0.35rem; }
-  .viewer-status-bar { padding: 0 0.5rem; font-size: 0.65rem; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .viewer-status-bar {
+    padding: 0.3rem 0.5rem;
+    padding-left: calc(0.5rem + env(safe-area-inset-left, 0px));
+    padding-right: calc(0.5rem + env(safe-area-inset-right, 0px));
+    padding-bottom: calc(0.3rem + env(safe-area-inset-bottom, 0px));
+    font-size: 0.65rem;
+  }
   .status-left { gap: 0.75rem; }
   .cad-tool-btn span:not(.badge) { display: none; }
   .cad-tool-btn { padding: 4px 6px; }
-  .measure-panel { min-width: auto; width: calc(100vw - 1rem); left: 0.5rem; transform: none; }
+  .measure-panel {
+    min-width: auto;
+    width: calc(100vw - 1rem);
+    left: 0.5rem;
+    transform: none;
+    top: 0.5rem;
+  }
+  .measure-panel.activo { animation: none; }
 }
 </style>
 </head>
@@ -662,7 +700,7 @@ body {
             </button>
           </div>
           <div class="measure-result" id="measureResult">
-            <span class="mr-hint">Elegí una herramienta y hacé clic sobre el dibujo.</span>
+            <span class="mr-hint">Elegí una herramienta y tocá el dibujo.</span>
           </div>
           <div class="measure-history" id="measureHistory"></div>
         </div>
@@ -784,6 +822,32 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { init as dwgInit, convertDwgToDxf, CDN_WASM_BASE } from 'dwgdxf';
 
 /* ============================================================
+   ALTURA DINÁMICA DE APP
+   visualViewport.height es lo único preciso en iOS/Android.
+============================================================ */
+function updateAppHeight() {
+  let h;
+  if (window.visualViewport && window.visualViewport.height) {
+    h = window.visualViewport.height;
+  } else {
+    h = window.innerHeight || document.documentElement.clientHeight;
+  }
+  if (h && h > 100) {
+    document.documentElement.style.setProperty('--app-height', h + 'px');
+  }
+}
+updateAppHeight();
+window.addEventListener('resize', updateAppHeight);
+window.addEventListener('orientationchange', () => {
+  setTimeout(updateAppHeight, 100);
+  setTimeout(updateAppHeight, 350);
+});
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', updateAppHeight);
+  window.visualViewport.addEventListener('scroll', updateAppHeight);
+}
+
+/* ============================================================
    DOM
 ============================================================ */
 const DOM = {
@@ -856,7 +920,6 @@ const stats = { fileSize: 0, fileName: '', entityCount: 0 };
 const layerHistory = [];
 const MAX_HISTORY = 60;
 let undoing = false;
-
 let wasmReady = false;
 
 /* ============================================================
@@ -896,7 +959,6 @@ function notificar(msg, tipo = 'ok') {
 }
 function setStatus(text) { DOM.statusState.textContent = text; }
 
-/* Paleta ACI simplificada */
 const ACI_1_9 = ['#000000', '#FF0000', '#FFFF00', '#00FF00', '#00FFFF',
                  '#0000FF', '#FF00FF', '#FFFFFF', '#808080', '#C0C0C0'];
 function hslToHex(h, s, l) {
@@ -927,7 +989,7 @@ function aciToHex(aci, layerAci) {
 }
 
 /* ============================================================
-   PARSER DXF — Tabla LAYER
+   PARSER LAYER TABLE
 ============================================================ */
 function parseLayersTable(dxfText) {
   const result = new Map();
@@ -980,7 +1042,7 @@ function parseLayersTable(dxfText) {
 }
 
 /* ============================================================
-   PARSER DXF — ENTITIES
+   PARSER ENTITIES
 ============================================================ */
 function cleanMText(s) {
   if (!s) return '';
@@ -1031,7 +1093,6 @@ function parseEntities(dxfText, defaultLayer) {
   if (!inEntities) return { segments, texts, snapPoints };
 
   let cur = null;
-  let curLayer = defaultLayer || '0';
   let textChunks = [];
 
   let lwVerts = null, lwClosed = false, lwPendingX = null;
@@ -1200,9 +1261,6 @@ function parseEntities(dxfText, defaultLayer) {
   return { segments, texts, snapPoints };
 }
 
-/* ============================================================
-   BOUNDS
-============================================================ */
 function computeBounds(segments, texts) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const s of segments) {
@@ -1227,13 +1285,13 @@ function computeBounds(segments, texts) {
 }
 
 /* ============================================================
-   THREE — Init
+   THREE Init
 ============================================================ */
 function initThree() {
   if (renderer) return;
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x0d1117, 1);
   renderer.domElement.style.display = 'block';
   renderer.domElement.style.width = '100%';
@@ -1272,6 +1330,7 @@ function updateCamera() {
   if (!camera || !renderer) return;
   const w = DOM.viewerContainer.clientWidth;
   const h = DOM.viewerContainer.clientHeight;
+  if (w === 0 || h === 0) return;
   const halfW = w / 2 * state.view.scale;
   const halfH = h / 2 * state.view.scale;
   camera.left = state.view.x - halfW;
@@ -1296,9 +1355,6 @@ function render() {
   renderer.render(scene, camera);
 }
 
-/* ============================================================
-   LINEWEIGHT → PX
-============================================================ */
 function lwToPx(lwRaw, globalScale) {
   let mm;
   if (lwRaw === 0) mm = 0.13;
@@ -1308,9 +1364,6 @@ function lwToPx(lwRaw, globalScale) {
   return Math.max(1, Math.min(24, px * globalScale));
 }
 
-/* ============================================================
-   ESCENA
-============================================================ */
 function buildSceneFromSegments() {
   if (!scene) return;
 
@@ -1400,9 +1453,6 @@ function setLayerVisible(layerName, visible) {
   render();
 }
 
-/* ============================================================
-   COORDENADAS
-============================================================ */
 function screenToWorld(clientX, clientY) {
   const rect = DOM.viewerContainer.getBoundingClientRect();
   const sx = clientX - rect.left;
@@ -1469,7 +1519,7 @@ function zoomOut() {
 }
 
 /* ============================================================
-   MOUSE CONTROLS
+   MOUSE
 ============================================================ */
 let panState = null;
 
@@ -1484,7 +1534,6 @@ function attachMouseControls() {
   }, { passive: false });
 
   el.addEventListener('mousedown', (e) => {
-    if (e.pointerType === 'touch') return;
     if (e.button === 1 || e.button === 2) {
       panState = { startX: e.clientX, startY: e.clientY, viewX: state.view.x, viewY: state.view.y };
       e.preventDefault();
@@ -1513,9 +1562,9 @@ function attachMouseControls() {
 }
 
 /* ============================================================
-   CONTROL TÁCTIL TIPO TRACKPAD
+   TOUCH — trackpad (touch events, más confiables que pointer)
 ============================================================ */
-const touch = {
+const touchState = {
   pointers: new Map(),
   lastPan: null,
   lastPinchDist: 0,
@@ -1525,81 +1574,80 @@ const touch = {
   tapMaxMove: 0,
   lastTapTime: 0,
   lastTapPos: { x: 0, y: 0 },
-  longPressTimer: null,
 };
+let lastTouchEndTime = 0;
 
 const TAP_MAX_MS = 300;
-const TAP_MAX_MOVE = 10;
+const TAP_MAX_MOVE = 12;
 const DOUBLE_TAP_MS = 320;
 
 function attachTouchControls() {
   const el = DOM.viewerContainer;
 
-  el.addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'touch') return;
-    try { el.setPointerCapture(e.pointerId); } catch (err) {}
+  el.addEventListener('touchstart', (e) => {
+    e.preventDefault();
 
-    touch.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    for (const t of e.changedTouches) {
+      touchState.pointers.set(t.identifier, { x: t.clientX, y: t.clientY });
+    }
 
-    if (touch.pointers.size === 1) {
-      touch.lastPan = { x: e.clientX, y: e.clientY };
-      touch.tapStartTime = Date.now();
-      touch.tapStartPos = { x: e.clientX, y: e.clientY };
-      touch.tapMaxMove = 0;
-
-      clearTimeout(touch.longPressTimer);
-      touch.longPressTimer = setTimeout(() => {
-        touch.longPressTimer = null;
-      }, 600);
-    } else if (touch.pointers.size === 2) {
-      clearTimeout(touch.longPressTimer);
-      touch.longPressTimer = null;
-      const pts = [...touch.pointers.values()];
-      touch.lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      touch.lastPinchCenter = {
+    if (touchState.pointers.size === 1) {
+      const t = e.changedTouches[0];
+      touchState.lastPan = { x: t.clientX, y: t.clientY };
+      touchState.tapStartTime = Date.now();
+      touchState.tapStartPos = { x: t.clientX, y: t.clientY };
+      touchState.tapMaxMove = 0;
+    } else if (touchState.pointers.size === 2) {
+      const pts = [...touchState.pointers.values()];
+      touchState.lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      touchState.lastPinchCenter = {
         x: (pts[0].x + pts[1].x) / 2,
         y: (pts[0].y + pts[1].y) / 2,
       };
-      touch.lastPan = null;
+      touchState.lastPan = null;
     }
-  });
+  }, { passive: false });
 
-  el.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'touch') return;
-    if (!touch.pointers.has(e.pointerId)) return;
+  el.addEventListener('touchmove', (e) => {
+    e.preventDefault();
 
-    touch.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-    if (touch.pointers.size === 1 && touch.tapStartTime > 0) {
-      const d = Math.hypot(e.clientX - touch.tapStartPos.x, e.clientY - touch.tapStartPos.y);
-      if (d > touch.tapMaxMove) touch.tapMaxMove = d;
+    for (const t of e.changedTouches) {
+      touchState.pointers.set(t.identifier, { x: t.clientX, y: t.clientY });
     }
 
-    if (touch.pointers.size === 1 && touch.lastPan) {
-      const dx = e.clientX - touch.lastPan.x;
-      const dy = e.clientY - touch.lastPan.y;
-      state.view.x -= dx * state.view.scale;
-      state.view.y += dy * state.view.scale;
-      touch.lastPan = { x: e.clientX, y: e.clientY };
-      updateCamera();
-      render();
-      drawMeasurePreview();
-    } else if (touch.pointers.size === 2) {
-      const pts = [...touch.pointers.values()];
-      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      const center = {
-        x: (pts[0].x + pts[1].x) / 2,
-        y: (pts[0].y + pts[1].y) / 2,
-      };
+    if (touchState.pointers.size === 1) {
+      const pts = [...touchState.pointers.values()];
+      const t = pts[0];
 
-      if (touch.lastPinchDist > 1 && dist > 1) {
-        const factor = touch.lastPinchDist / dist;
-        zoomAtScreenPoint(factor, center.x, center.y);
+      if (touchState.tapStartTime > 0) {
+        const d = Math.hypot(t.x - touchState.tapStartPos.x, t.y - touchState.tapStartPos.y);
+        if (d > touchState.tapMaxMove) touchState.tapMaxMove = d;
       }
 
-      if (touch.lastPinchCenter) {
-        const dx = center.x - touch.lastPinchCenter.x;
-        const dy = center.y - touch.lastPinchCenter.y;
+      if (touchState.lastPan) {
+        const dx = t.x - touchState.lastPan.x;
+        const dy = t.y - touchState.lastPan.y;
+        state.view.x -= dx * state.view.scale;
+        state.view.y += dy * state.view.scale;
+        touchState.lastPan = { x: t.x, y: t.y };
+        updateCamera();
+        render();
+        drawMeasurePreview();
+      }
+    } else if (touchState.pointers.size === 2) {
+      const pts = [...touchState.pointers.values()];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const cx = (pts[0].x + pts[1].x) / 2;
+      const cy = (pts[0].y + pts[1].y) / 2;
+
+      if (touchState.lastPinchDist > 1 && dist > 1) {
+        const factor = touchState.lastPinchDist / dist;
+        zoomAtScreenPoint(factor, cx, cy);
+      }
+
+      if (touchState.lastPinchCenter) {
+        const dx = cx - touchState.lastPinchCenter.x;
+        const dy = cy - touchState.lastPinchCenter.y;
         state.view.x -= dx * state.view.scale;
         state.view.y += dy * state.view.scale;
         updateCamera();
@@ -1607,63 +1655,63 @@ function attachTouchControls() {
         drawMeasurePreview();
       }
 
-      touch.lastPinchDist = dist;
-      touch.lastPinchCenter = center;
+      touchState.lastPinchDist = dist;
+      touchState.lastPinchCenter = { x: cx, y: cy };
     }
-  });
+  }, { passive: false });
 
-  const endPointer = (e) => {
-    if (e.pointerType !== 'touch') return;
-    if (!touch.pointers.has(e.pointerId)) return;
+  const endHandler = (e) => {
+    e.preventDefault();
+    lastTouchEndTime = Date.now();
 
-    const wasSingle = touch.pointers.size === 1;
-    touch.pointers.delete(e.pointerId);
+    const wasSingle = touchState.pointers.size === 1;
 
-    if (wasSingle) {
-      const elapsed = Date.now() - touch.tapStartTime;
-      const moved = touch.tapMaxMove;
-      clearTimeout(touch.longPressTimer);
-      touch.longPressTimer = null;
+    for (const t of e.changedTouches) {
+      touchState.pointers.delete(t.identifier);
+    }
+
+    if (wasSingle && e.changedTouches.length > 0) {
+      const t = e.changedTouches[0];
+      const elapsed = Date.now() - touchState.tapStartTime;
+      const moved = touchState.tapMaxMove;
 
       if (elapsed < TAP_MAX_MS && moved < TAP_MAX_MOVE) {
         const now = Date.now();
-        const isDoubleTap = (now - touch.lastTapTime < DOUBLE_TAP_MS) &&
-          Math.hypot(e.clientX - touch.lastTapPos.x, e.clientY - touch.lastTapPos.y) < 30;
+        const isDoubleTap = (now - touchState.lastTapTime < DOUBLE_TAP_MS) &&
+          Math.hypot(t.clientX - touchState.lastTapPos.x, t.clientY - touchState.lastTapPos.y) < 30;
 
         if (isDoubleTap) {
-          handleDoubleTap(e.clientX, e.clientY);
-          touch.lastTapTime = 0;
+          handleDoubleTap(t.clientX, t.clientY);
+          touchState.lastTapTime = 0;
         } else {
-          handleSingleTap(e.clientX, e.clientY);
-          touch.lastTapTime = now;
-          touch.lastTapPos = { x: e.clientX, y: e.clientY };
+          handleSingleTap(t.clientX, t.clientY);
+          touchState.lastTapTime = now;
+          touchState.lastTapPos = { x: t.clientX, y: t.clientY };
         }
       }
     }
 
-    if (touch.pointers.size === 1) {
-      const rem = [...touch.pointers.values()][0];
-      touch.lastPan = { x: rem.x, y: rem.y };
-      touch.lastPinchDist = 0;
-      touch.lastPinchCenter = null;
-    } else if (touch.pointers.size === 0) {
-      touch.lastPan = null;
-      touch.lastPinchDist = 0;
-      touch.lastPinchCenter = null;
-      touch.tapStartTime = 0;
-      touch.tapMaxMove = 0;
+    if (touchState.pointers.size === 1) {
+      const [t] = [...touchState.pointers.values()];
+      touchState.lastPan = { x: t.x, y: t.y };
+      touchState.lastPinchDist = 0;
+      touchState.lastPinchCenter = null;
+      touchState.tapStartTime = 0;
+    } else if (touchState.pointers.size === 0) {
+      touchState.lastPan = null;
+      touchState.lastPinchDist = 0;
+      touchState.lastPinchCenter = null;
+      touchState.tapStartTime = 0;
+      touchState.tapMaxMove = 0;
     }
   };
 
-  el.addEventListener('pointerup', endPointer);
-  el.addEventListener('pointercancel', endPointer);
+  el.addEventListener('touchend', endHandler, { passive: false });
+  el.addEventListener('touchcancel', endHandler, { passive: false });
 
   el.addEventListener('gesturestart', (e) => e.preventDefault());
   el.addEventListener('gesturechange', (e) => e.preventDefault());
   el.addEventListener('gestureend', (e) => e.preventDefault());
-  el.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 1) e.preventDefault();
-  }, { passive: false });
 }
 
 function handleSingleTap(clientX, clientY) {
@@ -1940,7 +1988,7 @@ function exitMeasureMode() {
   DOM.btnMeasure.classList.remove('active');
   clearMeasure();
   DOM.snapMarker.classList.add('oculto');
-  DOM.measureResult.innerHTML = '<span class="mr-hint">Elegí una herramienta y hacé clic sobre el dibujo.</span>';
+  DOM.measureResult.innerHTML = '<span class="mr-hint">Elegí una herramienta y tocá el dibujo.</span>';
   drawMeasurePreview();
 }
 function clearMeasure() {
@@ -1982,10 +2030,10 @@ function updateMeasureResult() {
 
 function updateMeasureHint() {
   const hints = {
-    distance: 'Hacé clic en dos puntos para medir la distancia.',
-    polyline: 'Hacé clic en varios puntos. Doble clic o ESC para terminar.',
-    area: 'Hacé clic en los vértices del polígono. Doble clic o ESC para cerrar y calcular área.',
-    angle: 'Hacé clic en tres puntos: inicial, vértice y final.',
+    distance: 'Tocá dos puntos para medir la distancia.',
+    polyline: 'Tocá varios puntos. Doble tap o ESC para terminar.',
+    area: 'Tocá los vértices del polígono. Doble tap o ESC para cerrar.',
+    angle: 'Tocá tres puntos: inicial, vértice y final.',
   };
   if (measurePoints.length === 0) {
     DOM.measureResult.innerHTML = `<span class="mr-hint">${hints[measureTool]}</span>`;
@@ -2031,7 +2079,7 @@ function renderMeasureHistoryList() {
 }
 
 /* ============================================================
-   PICKING 2D
+   PICKING
 ============================================================ */
 function pickLayerAtPoint(clientX, clientY, threshold = 12) {
   if (state.segments.length === 0) return null;
@@ -2208,7 +2256,7 @@ DOM.btnClickHide.addEventListener('click', () => {
   DOM.btnClickHide.classList.toggle('active', clickHideMode);
   DOM.btnClickHide.classList.toggle('active-danger', clickHideMode);
   DOM.canvasContainer.classList.toggle('mode-clickhide', clickHideMode);
-  if (clickHideMode) notificar('Clic o arrastrá un cuadro para apagar la capa');
+  if (clickHideMode) notificar('Tocá o arrastrá un cuadro para apagar la capa');
 });
 
 DOM.viewerContainer.addEventListener('pointerdown', (e) => {
@@ -2516,7 +2564,11 @@ async function processFile(file) {
 
     renderLayers();
 
-    if (state.bounds) fitView();
+    updateAppHeight();
+    setTimeout(() => {
+      resizeRenderer();
+      if (state.bounds) fitView();
+    }, 50);
 
     stats.fileSize = file.size;
     stats.fileName = file.name;
@@ -2666,7 +2718,9 @@ document.addEventListener('click', (e) => {
 DOM.pdfOptVisible.addEventListener('click', () => { DOM.pdfMenu.classList.remove('activo'); generatePdfVectorial(null); });
 DOM.pdfOptArea.addEventListener('click', () => { DOM.pdfMenu.classList.remove('activo'); enterPdfAreaMode(); });
 
+/* Mouse hover sobre el canvas: coords + snap marker */
 DOM.viewerContainer.addEventListener('mousemove', (e) => {
+  if (e.pointerType === 'touch') return;
   mouseScreen = { x: e.clientX, y: e.clientY };
 
   if (state.bounds) {
@@ -2701,7 +2755,7 @@ DOM.viewerContainer.addEventListener('mouseleave', () => {
 
 DOM.viewerContainer.addEventListener('click', (e) => {
   if (!measureMode) return;
-  if (e.pointerType === 'touch') return;
+  if (Date.now() - lastTouchEndTime < 500) return;
   e.stopPropagation(); e.preventDefault();
 
   const snap = findSnapPoint(e.clientX, e.clientY);
@@ -2723,6 +2777,7 @@ DOM.viewerContainer.addEventListener('click', (e) => {
 
 DOM.viewerContainer.addEventListener('dblclick', (e) => {
   if (!measureMode) return;
+  if (Date.now() - lastTouchEndTime < 500) return;
   if (measureTool === 'polyline' || measureTool === 'area') {
     e.stopPropagation(); e.preventDefault();
     if (measurePoints.length > 2) {
@@ -2775,7 +2830,6 @@ function updateMeasureResultLive() {
   }
 }
 
-// Teclado
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
@@ -2815,6 +2869,7 @@ try {
 } catch (e) {}
 
 window.addEventListener('resize', () => {
+  updateAppHeight();
   resizeRenderer();
   drawMeasurePreview();
 });
@@ -2822,6 +2877,7 @@ window.addEventListener('resize', () => {
 /* ============================================================
    INIT
 ============================================================ */
+updateAppHeight();
 attachMouseControls();
 attachTouchControls();
 DOM.lwValue.textContent = state.widthScale.toFixed(1) + '×';
