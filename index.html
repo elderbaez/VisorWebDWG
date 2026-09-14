@@ -1,271 +1,923 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor DWG con Capas y Textos</title>
-    <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: #f5f5f5;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            box-sizing: border-box;
-        }
-        h1 { font-size: 1.5rem; margin-bottom: 4px; }
-        .subtitle { color: #666; margin-bottom: 16px; font-size: 0.9rem; }
-        .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-        .controls input[type="file"] {
-            padding: 8px; border: 1px solid #ccc; border-radius: 6px; background: white;
-        }
-        .controls button {
-            padding: 8px 20px; border: none; border-radius: 6px;
-            background: #2563eb; color: white; font-weight: 600; cursor: pointer;
-            transition: background 0.2s;
-        }
-        .controls button:hover { background: #1d4ed8; }
-        .controls button:disabled { background: #94a3b8; cursor: not-allowed; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TopoView · Visor DWG Profesional</title>
 
-        .main-area {
-            display: flex;
-            flex: 1;
-            gap: 16px;
-            min-height: 0;
-        }
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-        #viewer-container {
-            flex: 1;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background: #1a1a1a;
-            overflow: hidden;
-            position: relative;
-        }
+<style>
+:root {
+  --bg: #121212; --panel: #1b1b1b; --panel-card: #242424;
+  --border: #2e2e2e; --border-hover: #404040;
+  --accent: #2f81f7; --accent-hover: #388bfd; --accent-glow: rgba(47, 129, 247, 0.15);
+  --success: #3fb950; --warning: #d29922; --danger: #f85149;
+  --text-main: #f0f6fc; --text-secondary: #8b949e; --text-dim: #484f58;
+  --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius-sm: 6px; --radius-md: 10px;
+  --shadow: 0 8px 24px rgba(0,0,0,0.5);
+  --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font); background-color: var(--bg); color: var(--text-main);
+  overflow: hidden; height: 100vh; width: 100vw;
+  -webkit-font-smoothing: antialiased; user-select: none;
+}
+.side-panel::-webkit-scrollbar { width: 6px; }
+.side-panel::-webkit-scrollbar-track { background: transparent; }
+.side-panel::-webkit-scrollbar-thumb { background: rgba(139,148,158,0.28); border-radius: 3px; }
 
-        #layer-panel {
-            width: 220px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 12px;
-            overflow-y: auto;
-            display: none;
-            flex-shrink: 0;
-        }
-        #layer-panel h3 {
-            margin: 0 0 8px 0;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #555;
-        }
-        .layer-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 4px 0;
-            font-size: 0.85rem;
-            cursor: pointer;
-        }
-        .layer-item input[type="checkbox"] {
-            cursor: pointer;
-            accent-color: #2563eb;
-        }
-        .layer-color {
-            width: 12px;
-            height: 12px;
-            border-radius: 3px;
-            border: 1px solid #ccc;
-            flex-shrink: 0;
-        }
-        .layer-name {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+#pantalla-visor { display: flex; flex-direction: column; height: 100vh; width: 100vw; background: var(--bg); position: relative; }
 
-        #status {
-            margin-top: 12px; padding: 10px 14px; background: #1e293b;
-            color: #e2e8f0; border-radius: 6px; font-family: monospace;
-            font-size: 0.85rem; min-height: 40px; white-space: pre-wrap;
-        }
-        .badge {
-            display: inline-block; padding: 2px 8px; border-radius: 4px;
-            font-size: 0.75rem; font-weight: 600; background: #dcfce7; color: #166534;
-        }
-    </style>
+/* ============ TOP BAR ============ */
+.viewer-top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1.25rem; background: var(--panel); border-bottom: 1px solid var(--border);
+  z-index: 50; flex-shrink: 0;
+}
+.app-title { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; color: var(--text-main); }
+.app-logo-svg { width: 22px; height: 22px; fill: var(--accent); }
+.app-subtitle { font-size: 0.7rem; font-weight: 500; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase; padding-left: 0.75rem; border-left: 1px solid var(--border); margin-left: 0.25rem; }
+.viewer-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.45rem 0.9rem; border-radius: var(--radius-sm);
+  font-weight: 600; font-size: 0.8rem; cursor: pointer;
+  border: 1px solid var(--border); background: var(--panel-card);
+  color: var(--text-secondary); transition: var(--transition); font-family: var(--font);
+}
+.btn:hover { background: var(--border); color: var(--text-main); border-color: var(--border-hover); }
+.btn svg { width: 15px; height: 15px; }
+.btn-accent { background: var(--accent); color: #fff; border-color: transparent; }
+.btn-accent:hover { background: var(--accent-hover); color: #fff; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-sidebar-toggle {
+  display: none; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--panel-card);
+  color: var(--text-main); cursor: pointer; transition: var(--transition);
+}
+.btn-sidebar-toggle:hover { background: var(--border); }
+.btn-sidebar-toggle svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+
+/* ============ BODY ============ */
+.viewer-body { flex: 1; display: flex; position: relative; overflow: hidden; }
+
+.side-panel {
+  width: 300px; background: var(--panel); border-right: 1px solid var(--border);
+  padding: 1.25rem 1rem; overflow-y: auto; flex-shrink: 0; z-index: 40;
+  transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1), transform 0.22s;
+}
+.side-panel.colapsado { margin-left: -300px; }
+
+.panel-section { margin-bottom: 1.5rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
+.panel-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.section-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-secondary); margin-bottom: 0.9rem; font-weight: 700;
+}
+.section-header svg { width: 14px; height: 14px; stroke: currentColor; fill: none; opacity: 0.8; }
+.section-count {
+  margin-left: auto; background: var(--panel-card); color: var(--text-dim);
+  padding: 1px 7px; border-radius: 10px; font-size: 0.65rem; font-weight: 700;
+  border: 1px solid var(--border);
+}
+
+/* File info */
+.file-info-card {
+  background: var(--panel-card); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 0.85rem;
+  display: flex; flex-direction: column; gap: 0.35rem;
+}
+.file-info-name {
+  font-size: 0.825rem; font-weight: 700; color: var(--text-main);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.file-info-meta { font-size: 0.7rem; color: var(--text-secondary); display: flex; gap: 0.75rem; }
+.file-info-meta span { display: inline-flex; align-items: center; gap: 4px; }
+.file-info-meta b { color: var(--accent); font-weight: 700; }
+
+/* Layers */
+.layer-list { display: flex; flex-direction: column; gap: 2px; }
+.layer-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.45rem 0.55rem; border-radius: var(--radius-sm);
+  cursor: pointer; transition: var(--transition); font-size: 0.775rem;
+  color: var(--text-main); font-weight: 500;
+}
+.layer-item:hover { background: rgba(255,255,255,0.04); }
+.layer-item input[type="checkbox"] {
+  accent-color: var(--accent); width: 14px; height: 14px;
+  cursor: pointer; border-radius: 4px; flex-shrink: 0;
+}
+.layer-color {
+  width: 12px; height: 12px; border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0;
+}
+.layer-name {
+  flex: 1; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; min-width: 0;
+}
+.layer-name small {
+  display: block; font-size: 0.65rem; font-weight: 500;
+  color: var(--text-dim); margin-top: 1px;
+}
+.layer-empty {
+  font-size: 0.75rem; color: var(--text-dim); text-align: center;
+  padding: 1rem 0.5rem; line-height: 1.5; font-weight: 500;
+}
+
+/* Quick actions in panel */
+.quick-actions { display: flex; flex-direction: column; gap: 0.5rem; }
+.btn-panel {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%;
+  padding: 0.55rem 0.75rem; border-radius: var(--radius-md);
+  background: var(--panel-card); border: 1px solid var(--border);
+  color: var(--text-main); font-family: var(--font); font-size: 0.775rem;
+  font-weight: 600; cursor: pointer; transition: var(--transition); text-align: left;
+}
+.btn-panel:hover { background: var(--border); border-color: var(--border-hover); }
+.btn-panel svg { width: 15px; height: 15px; stroke: currentColor; fill: none; flex-shrink: 0; }
+
+/* Main area */
+.main-area { flex: 1; display: flex; overflow: hidden; position: relative; }
+.canvas-container {
+  flex: 1; position: relative; background: #0d1117;
+  overflow: hidden; min-width: 0; min-height: 0;
+}
+#viewer-container { width: 100%; height: 100%; position: absolute; inset: 0; }
+
+/* Empty state */
+.empty-state {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1.25rem;
+  text-align: center; padding: 2rem; z-index: 5;
+  transition: opacity 0.3s ease; pointer-events: none;
+}
+.empty-state.hidden { opacity: 0; pointer-events: none; }
+.empty-state-icon {
+  width: 72px; height: 72px; border-radius: 18px;
+  background: linear-gradient(135deg, rgba(47,129,247,0.15), rgba(124,77,255,0.10));
+  border: 1px solid rgba(47,129,247,0.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.empty-state-icon svg { width: 34px; height: 34px; stroke: var(--accent); fill: none; opacity: 0.9; }
+.empty-state h2 { font-size: 1.15rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.01em; }
+.empty-state p { font-size: 0.825rem; color: var(--text-secondary); max-width: 340px; line-height: 1.55; font-weight: 500; }
+.empty-state .drop-hint {
+  font-size: 0.7rem; color: var(--text-dim); margin-top: 0.25rem;
+  padding: 0.3rem 0.75rem; border: 1px dashed var(--border);
+  border-radius: 20px; letter-spacing: 0.03em;
+}
+.empty-state .open-btn {
+  pointer-events: auto; margin-top: 0.5rem;
+}
+
+/* Drag overlay */
+.drag-overlay {
+  position: absolute; inset: 0; z-index: 100; display: none;
+  align-items: center; justify-content: center; flex-direction: column; gap: 0.75rem;
+  background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(8px);
+  border: 2px dashed var(--accent); border-radius: 0;
+  color: var(--text-main); font-weight: 700; font-size: 0.95rem;
+  pointer-events: none;
+}
+.drag-overlay.activo { display: flex; }
+.drag-overlay svg { width: 48px; height: 48px; stroke: var(--accent); fill: none; }
+
+/* Loading overlay */
+.loading-overlay {
+  position: absolute; inset: 0; z-index: 90; display: none;
+  align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
+  background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+.loading-overlay.activo { display: flex; }
+.spinner {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 3px solid rgba(47,129,247,0.15);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-label { font-size: 0.825rem; color: var(--text-secondary); font-weight: 600; letter-spacing: 0.02em; }
+.loading-sub { font-size: 0.7rem; color: var(--text-dim); font-weight: 500; max-width: 340px; text-align: center; }
+
+/* Info FAB */
+.info-fab {
+  position: absolute; bottom: 1rem; right: 1rem;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--border);
+  color: var(--text-main); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 200; transition: var(--transition);
+  box-shadow: var(--shadow);
+}
+.info-fab:hover { background: var(--accent); border-color: var(--accent); color: #fff; transform: scale(1.08); }
+.info-fab svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+
+.info-card {
+  position: absolute; bottom: 3.75rem; right: 1rem;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-md);
+  box-shadow: var(--shadow); width: 280px; padding: 1rem; z-index: 201;
+  display: none; flex-direction: column; gap: 0.65rem;
+  animation: infoSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.info-card.activo { display: flex; }
+@keyframes infoSlide { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.info-card-header { display: flex; align-items: center; gap: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+.info-card-logo {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), #7c4dff);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1rem; color: #fff; flex-shrink: 0;
+}
+.info-card-title { font-size: 0.875rem; font-weight: 700; color: var(--text-main); line-height: 1.2; }
+.info-card-sub { font-size: 0.68rem; color: var(--text-secondary); font-weight: 500; margin-top: 2px; }
+.info-link {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.55rem 0.7rem; background: var(--panel-card);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-main); text-decoration: none; font-size: 0.75rem;
+  font-weight: 600; transition: var(--transition);
+}
+.info-link:hover { background: var(--border); border-color: var(--border-hover); transform: translateX(2px); }
+.info-link > svg { width: 16px; height: 16px; stroke: currentColor; fill: none; flex-shrink: 0; }
+.info-link-label { display: flex; flex-direction: column; line-height: 1.15; }
+.info-link-label small { font-size: 0.62rem; color: var(--text-secondary); font-weight: 500; margin-top: 2px; }
+.info-link.whatsapp { background: rgba(37,211,102,0.10); border-color: rgba(37,211,102,0.35); color: #25D366; }
+.info-link.whatsapp:hover { background: rgba(37,211,102,0.20); border-color: #25D366; }
+.info-link.whatsapp > svg { fill: currentColor; stroke: none; }
+.info-link.whatsapp .info-link-label small { color: #25D366; opacity: 0.85; }
+
+/* ============ STATUS BAR ============ */
+.viewer-status-bar {
+  height: 32px; background: var(--panel); border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1rem; font-size: 0.72rem; font-weight: 500;
+  color: var(--text-secondary); z-index: 50; flex-shrink: 0;
+}
+.status-left { display: flex; gap: 1.25rem; align-items: center; }
+.status-left span { display: inline-flex; align-items: center; gap: 6px; }
+.status-left b { color: var(--text-main); font-weight: 700; }
+.status-right { display: flex; gap: 0.35rem; align-items: center; }
+.cad-tool-btn {
+  background: transparent; border: none; color: var(--text-secondary);
+  cursor: pointer; padding: 3px 8px; border-radius: 4px;
+  display: flex; align-items: center; gap: 5px;
+  transition: var(--transition); font-weight: 600; font-family: var(--font);
+  font-size: 0.72rem;
+}
+.cad-tool-btn:hover { background: var(--border); color: var(--text-main); }
+.cad-tool-btn.active { background: var(--accent); color: #fff; }
+.cad-tool-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; }
+
+/* Notification */
+.notificacion {
+  position: fixed; bottom: 3.75rem; left: 50%; transform: translateX(-50%);
+  background: var(--success); color: #fff; padding: 0.7rem 1.15rem;
+  border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 700;
+  z-index: 9999; box-shadow: var(--shadow);
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.notificacion.error { background: var(--danger); }
+.notificacion.warn { background: var(--warning); color: #1a1a1a; }
+@keyframes slideUp { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .btn-sidebar-toggle { display: inline-flex; }
+  .side-panel {
+    position: absolute; top: 0; left: 0; bottom: 0; z-index: 500;
+    box-shadow: 6px 0 20px rgba(0,0,0,0.55); transform: translateX(0); margin-left: 0;
+  }
+  .side-panel.colapsado { transform: translateX(-100%); margin-left: 0; }
+  .viewer-top-bar { padding: 0.55rem 0.75rem; gap: 0.4rem; }
+  .app-title { font-size: 0.9rem; gap: 0.4rem; }
+  .app-subtitle { display: none; }
+  .btn span.btn-label { display: none; }
+  .btn { padding: 0.45rem 0.6rem; }
+  .viewer-actions { gap: 0.35rem; }
+  .viewer-status-bar { padding: 0 0.5rem; font-size: 0.65rem; }
+  .status-left { gap: 0.75rem; }
+  .cad-tool-btn span { display: none; }
+  .cad-tool-btn { padding: 4px 6px; }
+}
+</style>
 </head>
 <body>
 
-    <h1>Visor DWG con Panel de Capas</h1>
-    <p class="subtitle">
-        Conversión DWG → DXF con <strong>dwgdxf</strong> (acadrust/WASM) · Renderizado con <strong>dxf-viewer</strong>
-        <span class="badge">100% cliente</span>
-    </p>
-
-    <div class="controls">
-        <input type="file" id="file-input" accept=".dwg">
-        <button id="convert-btn" disabled>Convertir y Ver</button>
+<div id="pantalla-visor">
+  <!-- ============ TOP BAR ============ -->
+  <div class="viewer-top-bar">
+    <div style="display: flex; align-items: center; gap: 0.6rem;">
+      <button class="btn-sidebar-toggle" id="btnSidebarToggle" title="Mostrar/ocultar panel">
+        <svg viewBox="0 0 24 24" stroke-width="2" fill="none"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="app-title">
+        <svg class="app-logo-svg" viewBox="0 0 24 24"><path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z"/></svg>
+        <span>TopoView</span>
+        <span class="app-subtitle">Visor DWG</span>
+      </div>
     </div>
+    <div class="viewer-actions">
+      <button class="btn btn-accent" id="btnOpen" title="Abrir archivo DWG">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span class="btn-label">Abrir DWG</span>
+      </button>
+      <button class="btn" id="btnScreenshot" title="Exportar captura PNG" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span class="btn-label">Captura</span>
+      </button>
+    </div>
+  </div>
 
-    <div class="main-area">
-        <div id="viewer-container"></div>
-        <div id="layer-panel">
-            <h3>Capas</h3>
-            <div id="layer-list"></div>
+  <!-- ============ BODY ============ -->
+  <div class="viewer-body">
+    <!-- Side panel -->
+    <div class="side-panel" id="sidePanel">
+      <div class="panel-section" id="sectionFile" style="display: none;">
+        <div class="section-header">
+          <svg viewBox="0 0 24 24" stroke-width="1.75"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Archivo
         </div>
+        <div class="file-info-card">
+          <div class="file-info-name" id="fileName">—</div>
+          <div class="file-info-meta">
+            <span>Tamaño: <b id="fileSize">—</b></span>
+            <span>Entidades: <b id="entCount">—</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section" id="sectionLayers">
+        <div class="section-header">
+          <svg viewBox="0 0 24 24" stroke-width="1.75"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Capas
+          <span class="section-count" id="layerCount">0</span>
+        </div>
+        <div class="layer-list" id="layerList">
+          <div class="layer-empty" id="layerEmpty">Cargá un archivo DWG para ver las capas del dibujo.</div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="section-header">
+          <svg viewBox="0 0 24 24" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Acciones
+        </div>
+        <div class="quick-actions">
+          <button class="btn-panel" id="btnFitView" disabled>
+            <svg viewBox="0 0 24 24" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+            Ajustar a pantalla
+          </button>
+          <button class="btn-panel" id="btnToggleAll" disabled>
+            <svg viewBox="0 0 24 24" stroke-width="1.75"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="txtToggleAll">Ocultar todas las capas</span>
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div id="status">Esperando archivo DWG...</div>
+    <!-- Main area -->
+    <div class="main-area">
+      <div class="canvas-container" id="canvasContainer">
+        <div id="viewer-container"></div>
 
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-            "dwgdxf": "https://cdn.jsdelivr.net/npm/dwgdxf@2.0.1/+esm",
-            "dxf-viewer": "https://cdn.jsdelivr.net/npm/dxf-viewer@1.0.48/+esm"
-        }
+        <!-- Empty state -->
+        <div class="empty-state" id="emptyState">
+          <div class="empty-state-icon">
+            <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="9" y1="13" x2="15" y2="13"/>
+              <line x1="9" y1="17" x2="15" y2="17"/>
+            </svg>
+          </div>
+          <h2>Visor DWG profesional</h2>
+          <p>Arrastrá un archivo <b>.dwg</b> aquí o abrí uno desde tu equipo para verlo al instante. Compatible con versiones R13 a R2018.</p>
+          <button class="btn btn-accent open-btn" id="btnOpenEmpty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Abrir DWG
+          </button>
+          <span class="drop-hint">También podés soltar el archivo en cualquier parte</span>
+        </div>
+
+        <!-- Drag overlay -->
+        <div class="drag-overlay" id="dragOverlay">
+          <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <div>Soltá el archivo para abrirlo</div>
+        </div>
+
+        <!-- Loading overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+          <div class="spinner"></div>
+          <div class="loading-label" id="loadingLabel">Procesando archivo…</div>
+          <div class="loading-sub" id="loadingSub">Esto puede tardar unos segundos en dibujos grandes.</div>
+        </div>
+
+        <!-- Info FAB -->
+        <button class="info-fab" id="infoFab" title="Información de contacto">
+          <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </button>
+        <div class="info-card" id="infoCard" role="dialog">
+          <div class="info-card-header">
+            <div class="info-card-logo">S</div>
+            <div>
+              <div class="info-card-title">STRUTEC</div>
+              <div class="info-card-sub">Topografía · Construcción</div>
+            </div>
+          </div>
+          <a class="info-link" href="https://structec.com.py/" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+            <div class="info-link-label">Sitio web<small>structec.com.py</small></div>
+          </a>
+          <a class="info-link whatsapp" href="https://api.whatsapp.com/send/?phone=595971853861&text&type=phone_number&app_absent=0" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+            <div class="info-link-label">WhatsApp<small>+595 971 853 861</small></div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ STATUS BAR ============ -->
+  <div class="viewer-status-bar">
+    <div class="status-left">
+      <span id="statusState">Sin archivo cargado</span>
+      <span style="display:none;" id="statusCoords">Coordenadas: <b id="statusXY">—</b></span>
+    </div>
+    <div class="status-right">
+      <button class="cad-tool-btn" id="btnZoomIn" title="Acercar" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <button class="cad-tool-btn" id="btnZoomOut" title="Alejar" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <button class="cad-tool-btn" id="btnFit" title="Ajustar a pantalla" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M21 8V5a2 2 0 00-2-2h-3"/><path d="M3 16v3a2 2 0 002 2h3"/><path d="M16 21h3a2 2 0 002-2v-3"/></svg>
+        <span>Ajustar</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".dwg" hidden>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "dwgdxf": "https://cdn.jsdelivr.net/npm/dwgdxf@2.0.1/+esm",
+    "dxf-viewer": "https://cdn.jsdelivr.net/npm/dxf-viewer@1.0.48/+esm"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+window.THREE = THREE;
+
+import { init, convertDwgToDxf, CDN_WASM_BASE } from 'dwgdxf';
+import { DxfViewer } from 'dxf-viewer';
+
+/* ============================================================
+   REFERENCIAS DOM
+============================================================ */
+const DOM = {
+  btnOpen: document.getElementById('btnOpen'),
+  btnOpenEmpty: document.getElementById('btnOpenEmpty'),
+  btnScreenshot: document.getElementById('btnScreenshot'),
+  btnSidebarToggle: document.getElementById('btnSidebarToggle'),
+  btnFitView: document.getElementById('btnFitView'),
+  btnToggleAll: document.getElementById('btnToggleAll'),
+  txtToggleAll: document.getElementById('txtToggleAll'),
+  btnZoomIn: document.getElementById('btnZoomIn'),
+  btnZoomOut: document.getElementById('btnZoomOut'),
+  btnFit: document.getElementById('btnFit'),
+  fileInput: document.getElementById('fileInput'),
+  sidePanel: document.getElementById('sidePanel'),
+  sectionFile: document.getElementById('sectionFile'),
+  fileName: document.getElementById('fileName'),
+  fileSize: document.getElementById('fileSize'),
+  entCount: document.getElementById('entCount'),
+  layerList: document.getElementById('layerList'),
+  layerEmpty: document.getElementById('layerEmpty'),
+  layerCount: document.getElementById('layerCount'),
+  canvasContainer: document.getElementById('canvasContainer'),
+  viewerContainer: document.getElementById('viewer-container'),
+  emptyState: document.getElementById('emptyState'),
+  dragOverlay: document.getElementById('dragOverlay'),
+  loadingOverlay: document.getElementById('loadingOverlay'),
+  loadingLabel: document.getElementById('loadingLabel'),
+  loadingSub: document.getElementById('loadingSub'),
+  infoFab: document.getElementById('infoFab'),
+  infoCard: document.getElementById('infoCard'),
+  statusState: document.getElementById('statusState'),
+  statusCoords: document.getElementById('statusCoords'),
+  statusXY: document.getElementById('statusXY'),
+};
+
+/* ============================================================
+   ESTADO
+============================================================ */
+let viewer = null;
+let wasmReady = false;
+let layersState = new Map(); // name -> { color, visible }
+let stats = { fileSize: 0, fileName: '', entityCount: 0, layerCount: 0 };
+const SCREENSHOT_NAME = () => `topoview_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
+
+/* ============================================================
+   UTILS
+============================================================ */
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(2) + ' MB';
+}
+function numToHex(c) {
+  return '#' + (c >>> 0).toString(16).padStart(6, '0').slice(-6);
+}
+function notificar(msg, tipo = 'ok') {
+  const n = document.createElement('div');
+  n.className = 'notificacion' + (tipo === 'error' ? ' error' : tipo === 'warn' ? ' warn' : '');
+  n.textContent = msg;
+  document.body.appendChild(n);
+  setTimeout(() => {
+    n.style.transition = 'opacity 0.3s, transform 0.3s';
+    n.style.opacity = '0'; n.style.transform = 'translate(-50%, 8px)';
+    setTimeout(() => n.remove(), 320);
+  }, 2800);
+}
+function setStatus(text) { DOM.statusState.textContent = text; }
+
+/* ============================================================
+   CARGA DE FUENTES ROBUSTA
+   Probamos varias URLs; validamos la firma binaria TTF/OTF.
+   Si ninguna carga, devolvemos [] y el visor no rompe.
+============================================================ */
+async function loadValidFonts(urls) {
+  const valid = [];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) continue;
+      const buf = await res.arrayBuffer();
+      if (buf.byteLength < 12) continue;
+      const view = new DataView(buf);
+      const sig = view.getUint32(0, false);
+      // Firma TrueType (0x00010000) o OpenType con curvas CFF (0x4F54544F "OTTO")
+      // también aceptamos 'true' (0x74727565) y 'ttcf' (0x74746366) para colecciones
+      const ok =
+        sig === 0x00010000 ||
+        sig === 0x4F54544F ||
+        sig === 0x74727565 ||
+        sig === 0x74746366;
+      if (!ok) continue;
+      const blob = new Blob([buf], { type: 'font/ttf' });
+      valid.push(URL.createObjectURL(blob));
+    } catch (e) { /* ignorar */ }
+  }
+  return valid;
+}
+
+const FONT_CANDIDATES = [
+  'https://cdn.jsdelivr.net/npm/@expo-google-fonts/roboto@0.2.3/Roboto_400Regular.ttf',
+  'https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-400-normal.woff2',
+  'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Regular.ttf',
+  'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf',
+  'https://cdn.jsdelivr.net/gh/googlefonts/roboto@main/src/hinted/Roboto-Regular.ttf',
+];
+
+let cachedFonts = null;
+async function getFonts() {
+  if (cachedFonts) return cachedFonts;
+  cachedFonts = await loadValidFonts(FONT_CANDIDATES);
+  return cachedFonts;
+}
+
+/* ============================================================
+   INICIALIZAR VISOR
+============================================================ */
+function initViewer() {
+  if (viewer) {
+    try { viewer.Destroy(); } catch (e) {}
+    viewer = null;
+  }
+  viewer = new DxfViewer(DOM.viewerContainer, {
+    clearColor: new THREE.Color(0x0d1117),
+    autoResize: true,
+  });
+  return viewer;
+}
+
+/* ============================================================
+   RENDERIZAR PANEL DE CAPAS
+============================================================ */
+function renderLayers() {
+  DOM.layerList.innerHTML = '';
+  if (layersState.size === 0) {
+    DOM.layerList.appendChild(DOM.layerEmpty);
+    DOM.layerEmpty.style.display = '';
+    DOM.layerCount.textContent = '0';
+    DOM.btnToggleAll.disabled = true;
+    return;
+  }
+  DOM.layerEmpty.style.display = 'none';
+  DOM.layerCount.textContent = String(layersState.size);
+  DOM.btnToggleAll.disabled = false;
+
+  // Ordenar: primero las visibles, luego por nombre
+  const entries = [...layersState.entries()].sort((a, b) => {
+    if (a[1].visible !== b[1].visible) return a[1].visible ? -1 : 1;
+    return a[0].localeCompare(b[0]);
+  });
+
+  for (const [name, info] of entries) {
+    const item = document.createElement('label');
+    item.className = 'layer-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = info.visible;
+    cb.addEventListener('change', () => {
+      info.visible = cb.checked;
+      try { viewer.ShowLayer(name, cb.checked); } catch (e) { console.warn(e); }
+      updateToggleAllLabel();
+    });
+
+    const sw = document.createElement('span');
+    sw.className = 'layer-color';
+    sw.style.background = numToHex(info.color);
+
+    const nm = document.createElement('span');
+    nm.className = 'layer-name';
+    nm.textContent = name;
+    nm.title = name;
+
+    item.appendChild(cb);
+    item.appendChild(sw);
+    item.appendChild(nm);
+    DOM.layerList.appendChild(item);
+  }
+  updateToggleAllLabel();
+}
+
+function updateToggleAllLabel() {
+  const total = layersState.size;
+  const visibles = [...layersState.values()].filter(v => v.visible).length;
+  DOM.txtToggleAll.textContent = visibles === 0 ? 'Mostrar todas las capas'
+    : visibles === total ? 'Ocultar todas las capas'
+    : `Alternar visibilidad (${visibles}/${total})`;
+}
+
+/* ============================================================
+   PROCESO PRINCIPAL: DWG -> DXF -> RENDER
+============================================================ */
+async function processFile(file) {
+  if (!file) return;
+  if (!/\.dwg$/i.test(file.name)) {
+    notificar('El archivo debe tener extensión .dwg', 'error');
+    return;
+  }
+
+  // Reset estado
+  DOM.emptyState.classList.add('hidden');
+  DOM.loadingOverlay.classList.add('activo');
+  DOM.loadingLabel.textContent = 'Preparando motor de conversión…';
+  DOM.loadingSub.textContent = 'La primera vez puede tardar unos segundos.';
+  DOM.btnOpen.disabled = true;
+  DOM.btnScreenshot.disabled = true;
+  DOM.btnFitView.disabled = true;
+  DOM.btnZoomIn.disabled = true;
+  DOM.btnZoomOut.disabled = true;
+  DOM.btnFit.disabled = true;
+  setStatus('Procesando ' + file.name);
+
+  try {
+    // 1. Inicializar WASM (solo la primera vez)
+    if (!wasmReady) {
+      await init({ wasmBase: CDN_WASM_BASE });
+      wasmReady = true;
     }
-    </script>
 
-    <script type="module">
-        import * as THREE from 'three';
-        window.THREE = THREE;
+    DOM.loadingLabel.textContent = 'Leyendo archivo DWG…';
+    const buf = await file.arrayBuffer();
+    const dwgBytes = new Uint8Array(buf);
 
-        import { init, convertDwgToDxf, CDN_WASM_BASE } from 'dwgdxf';
-        import { DxfViewer } from 'dxf-viewer';
+    // 2. Convertir a DXF
+    DOM.loadingLabel.textContent = 'Convirtiendo DWG a DXF…';
+    DOM.loadingSub.textContent = 'Esto se ejecuta por completo en tu navegador.';
+    const dxfBytes = await convertDwgToDxf(dwgBytes);
+    const dxfText = new TextDecoder().decode(dxfBytes);
 
-        const fileInput = document.getElementById('file-input');
-        const convertBtn = document.getElementById('convert-btn');
-        const statusEl = document.getElementById('status');
-        const viewerContainer = document.getElementById('viewer-container');
-        const layerPanel = document.getElementById('layer-panel');
-        const layerList = document.getElementById('layer-list');
+    // 3. Cargar fuentes (cacheadas)
+    DOM.loadingLabel.textContent = 'Cargando tipografías…';
+    const fonts = await getFonts();
 
-        let selectedFile = null;
-        let viewer = null;
+    // 4. Crear visor y cargar DXF
+    DOM.loadingLabel.textContent = 'Renderizando dibujo…';
+    DOM.loadingSub.textContent = 'Optimizando geometría para WebGL.';
+    initViewer();
 
-        function log(message) {
-            statusEl.textContent = message;
-        }
+    const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
+    const dxfUrl = URL.createObjectURL(dxfBlob);
 
-        function initViewer() {
-            if (viewer) {
-                viewer.Destroy();
-                viewer = null;
-            }
-            viewer = new DxfViewer(viewerContainer, {
-                clearColor: new THREE.Color(0x1a1a1a),
-                autoResize: true,
-            });
-            return viewer;
-        }
+    const loadOpts = { url: dxfUrl };
+    if (fonts.length > 0) loadOpts.fonts = fonts;
 
-        function buildLayerPanel() {
-            layerList.innerHTML = '';
-            if (!viewer) return;
+    await viewer.Load(loadOpts);
+    URL.revokeObjectURL(dxfUrl);
 
-            const layers = viewer.GetLayers();
-            const layerArray = Array.from(layers);
+    // 5. Extraer capas
+    layersState.clear();
+    try {
+      const layers = viewer.GetLayers();
+      for (const L of layers) {
+        layersState.set(L.name, { color: L.color, visible: true });
+      }
+    } catch (e) { console.warn('No se pudieron leer capas:', e); }
+    renderLayers();
 
-            if (layerArray.length === 0) {
-                layerPanel.style.display = 'none';
-                return;
-            }
+    // 6. Actualizar stats
+    stats.fileSize = file.size;
+    stats.fileName = file.name;
+    DOM.fileName.textContent = file.name;
+    DOM.fileName.title = file.name;
+    DOM.fileSize.textContent = fmtBytes(file.size);
+    // Aproximamos entidades por líneas del DXF
+    const entMatch = dxfText.match(/\n\s*0\s*\n/g);
+    stats.entityCount = entMatch ? entMatch.length : 0;
+    DOM.entCount.textContent = stats.entityCount.toLocaleString('es');
+    DOM.sectionFile.style.display = '';
 
-            layerArray.forEach(layerInfo => {
-                const item = document.createElement('div');
-                item.className = 'layer-item';
+    // 7. Habilitar botones
+    DOM.btnScreenshot.disabled = false;
+    DOM.btnFitView.disabled = false;
+    DOM.btnZoomIn.disabled = false;
+    DOM.btnZoomOut.disabled = false;
+    DOM.btnFit.disabled = false;
 
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.checked = true;
-                checkbox.id = `layer-${layerInfo.name}`;
+    setStatus(`Listo · ${stats.entityCount.toLocaleString('es')} entidades · ${layersState.size} capas`);
+    notificar('Dibujo cargado correctamente');
+    if (fonts.length === 0) {
+      notificar('No se pudieron cargar tipografías: los textos no se mostrarán', 'warn');
+    }
+  } catch (err) {
+    console.error(err);
+    notificar('Error al procesar el archivo: ' + (err.message || err), 'error');
+    setStatus('Error al procesar el archivo');
+    if (!viewer) DOM.emptyState.classList.remove('hidden');
+  } finally {
+    DOM.loadingOverlay.classList.remove('activo');
+    DOM.btnOpen.disabled = false;
+  }
+}
 
-                const colorHex = '#' + layerInfo.color.toString(16).padStart(6, '0');
-                const colorSwatch = document.createElement('span');
-                colorSwatch.className = 'layer-color';
-                colorSwatch.style.backgroundColor = colorHex;
+/* ============================================================
+   EVENTOS: ABRIR / DRAG & DROP
+============================================================ */
+function openFileDialog() { DOM.fileInput.click(); }
+DOM.btnOpen.addEventListener('click', openFileDialog);
+DOM.btnOpenEmpty.addEventListener('click', openFileDialog);
+DOM.fileInput.addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) processFile(f);
+  e.target.value = '';
+});
 
-                const label = document.createElement('span');
-                label.className = 'layer-name';
-                label.textContent = layerInfo.name;
+// Drag & drop
+let dragCounter = 0;
+['dragenter', 'dragover'].forEach(ev => {
+  window.addEventListener(ev, (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
+      dragCounter++;
+      DOM.dragOverlay.classList.add('activo');
+    }
+  });
+});
+['dragleave', 'drop'].forEach(ev => {
+  window.addEventListener(ev, (e) => {
+    e.preventDefault();
+    if (ev === 'dragleave') {
+      dragCounter = Math.max(0, dragCounter - 1);
+      if (dragCounter === 0) DOM.dragOverlay.classList.remove('activo');
+    } else {
+      dragCounter = 0;
+      DOM.dragOverlay.classList.remove('activo');
+    }
+  });
+});
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) processFile(f);
+});
 
-                checkbox.addEventListener('change', (e) => {
-                    viewer.ShowLayer(layerInfo.name, e.target.checked);
-                });
+/* ============================================================
+   ACCIONES DEL PANEL Y STATUS BAR
+============================================================ */
+DOM.btnSidebarToggle.addEventListener('click', () => {
+  DOM.sidePanel.classList.toggle('colapsado');
+  setTimeout(() => { if (viewer) viewer.Resize && viewer.Resize(); }, 240);
+});
 
-                item.appendChild(checkbox);
-                item.appendChild(colorSwatch);
-                item.appendChild(label);
-                layerList.appendChild(item);
-            });
+DOM.btnFitView.addEventListener('click', () => {
+  try { viewer.FitView(); } catch (e) { console.warn(e); }
+});
+DOM.btnFit.addEventListener('click', () => {
+  try { viewer.FitView(); } catch (e) { console.warn(e); }
+});
 
-            layerPanel.style.display = 'block';
-        }
+DOM.btnZoomIn.addEventListener('click', () => {
+  try { viewer.ZoomIn && viewer.ZoomIn(); } catch (e) {}
+});
+DOM.btnZoomOut.addEventListener('click', () => {
+  try { viewer.ZoomOut && viewer.ZoomOut(); } catch (e) {}
+});
 
-        fileInput.addEventListener('change', (e) => {
-            selectedFile = e.target.files[0] || null;
-            convertBtn.disabled = !selectedFile;
-            layerPanel.style.display = 'none';
-            if (selectedFile) {
-                log(`Archivo seleccionado: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)`);
-            } else {
-                log('Esperando archivo DWG...');
-            }
-        });
+DOM.btnToggleAll.addEventListener('click', () => {
+  const total = layersState.size;
+  const visibles = [...layersState.values()].filter(v => v.visible).length;
+  const target = visibles > 0 ? false : true; // si hay visibles, ocultamos todas; si no, mostramos
+  for (const [name, info] of layersState) {
+    info.visible = target;
+    try { viewer.ShowLayer(name, target); } catch (e) {}
+  }
+  renderLayers();
+  notificar(target ? 'Todas las capas visibles' : 'Todas las capas ocultas');
+});
 
-        convertBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
+DOM.btnScreenshot.addEventListener('click', () => {
+  try {
+    const canvas = DOM.viewerContainer.querySelector('canvas');
+    if (!canvas) { notificar('No hay dibujo para capturar', 'error'); return; }
+    canvas.toBlob((blob) => {
+      if (!blob) { notificar('No se pudo generar la captura', 'error'); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = SCREENSHOT_NAME();
+      a.click();
+      URL.revokeObjectURL(url);
+      notificar('Captura descargada');
+    }, 'image/png');
+  } catch (e) {
+    notificar('Error al capturar: ' + e.message, 'error');
+  }
+});
 
-            convertBtn.disabled = true;
-            log('⏳ Inicializando módulo WASM...');
+/* ============================================================
+   INFO CARD
+============================================================ */
+DOM.infoFab.addEventListener('click', (e) => {
+  e.stopPropagation();
+  DOM.infoCard.classList.toggle('activo');
+});
+document.addEventListener('click', (e) => {
+  if (!DOM.infoCard.classList.contains('activo')) return;
+  if (DOM.infoCard.contains(e.target) || DOM.infoFab.contains(e.target)) return;
+  DOM.infoCard.classList.remove('activo');
+});
 
-            try {
-                await init({ wasmBase: CDN_WASM_BASE });
-                log('✅ WASM listo. Leyendo archivo DWG...');
+/* ============================================================
+   COORDENADAS DE MOUSE (aprox: 0..100% del viewport)
+============================================================ */
+DOM.viewerContainer.addEventListener('mousemove', (e) => {
+  if (!viewer) return;
+  const rect = DOM.viewerContainer.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * 100;
+  const y = ((e.clientY - rect.top) / rect.height) * 100;
+  DOM.statusCoords.style.display = '';
+  DOM.statusXY.textContent = `${x.toFixed(1)}% , ${y.toFixed(1)}%`;
+});
+DOM.viewerContainer.addEventListener('mouseleave', () => {
+  DOM.statusCoords.style.display = 'none';
+});
 
-                const arrayBuffer = await selectedFile.arrayBuffer();
-                const dwgBytes = new Uint8Array(arrayBuffer);
-
-                log('🔄 Convirtiendo DWG a DXF...');
-                const dxfBytes = await convertDwgToDxf(dwgBytes);
-                const dxfText = new TextDecoder().decode(dxfBytes);
-                log(`✅ Conversión exitosa. DXF: ${(dxfBytes.length / 1024).toFixed(1)} KB. Renderizando...`);
-
-                initViewer();
-
-                const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
-                const dxfUrl = URL.createObjectURL(dxfBlob);
-
-                // 🔤 FUENTE LOCAL (en el repositorio)
-                //    Ruta relativa: /fonts/Roboto-Regular.ttf
-                await viewer.Load({
-                    url: dxfUrl,
-                    fonts: [
-                        'fonts/Roboto-Regular.ttf'
-                    ]
-                });
-
-                URL.revokeObjectURL(dxfUrl);
-
-                buildLayerPanel();
-
-                log('✅ Dibujo renderizado. Usa el ratón para hacer zoom. Las capas están a la derecha.');
-
-            } catch (err) {
-                console.error(err);
-                log(`❌ Error: ${err.message || err}`);
-                layerPanel.style.display = 'none';
-            } finally {
-                convertBtn.disabled = false;
-            }
-        });
-
-        initViewer();
-    </script>
+/* ============================================================
+   TECLADO
+============================================================ */
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+    e.preventDefault(); openFileDialog();
+  }
+  if (e.key === 'Escape') {
+    DOM.infoCard.classList.remove('activo');
+  }
+});
+</script>
 </body>
 </html>
