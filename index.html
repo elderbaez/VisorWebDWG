@@ -446,7 +446,7 @@ body {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
         <span class="btn-label">Abrir</span>
       </button>
-      <button class="btn" id="btnPdf" title="Exportar a PDF vectorial" disabled>
+      <button class="btn" id="btnPdf" title="Exportar a PDF" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
         <span class="btn-label">PDF</span>
         <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
@@ -455,14 +455,14 @@ body {
         <div class="pdf-menu-item" id="pdfOptVisible">
           <svg viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           <div>
-            <div class="pdf-mi-title">Exportar vista actual (vectorial)</div>
-            <div class="pdf-mi-sub">Genera un PDF vectorial con lo que se ve en pantalla.</div>
+            <div class="pdf-mi-title">Exportar vista completa</div>
+            <div class="pdf-mi-sub">Genera un PDF con todo el dibujo visible.</div>
           </div>
         </div>
         <div class="pdf-menu-item" id="pdfOptArea">
           <svg viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
           <div>
-            <div class="pdf-mi-title">Seleccionar un área (vectorial)</div>
+            <div class="pdf-mi-title">Seleccionar área</div>
             <div class="pdf-mi-sub">Arrastrá un rectángulo y se exportará solo esa zona.</div>
           </div>
         </div>
@@ -509,7 +509,6 @@ body {
 
         <div class="snap-marker oculto" id="snapMarker"></div>
 
-        <!-- Panel flotante de medición -->
         <div class="measure-panel" id="measurePanel">
           <div class="measure-header">
             <span>Medición</span>
@@ -743,19 +742,14 @@ const layerHistory = [];
 let undoing = false;
 const MAX_HISTORY = 60;
 
-/* ============================================================
-   MEDICIÓN — Estado
-============================================================ */
 let measureTool = 'distance';
 let measurePoints = [];
 let measureSnaps = new Set(['endpoint', 'midpoint', 'center', 'nearest', 'intersection', 'perpendicular', 'fictitious']);
 let lastSnapPoint = null;
 let mouseScreen = { x: 0, y: 0 };
-let rawDxfText = ''; // Guardar el DXF crudo para PDF vectorial
+let rawDxfText = '';
+let measureRedrawRAF = null;
 
-/* ============================================================
-   UTILS
-============================================================ */
 function fmtBytes(b) {
   if (b < 1024) return b + ' B';
   if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
@@ -781,9 +775,6 @@ function notificar(msg, tipo = 'ok') {
 }
 function setStatus(text) { DOM.statusState.textContent = text; }
 
-/* ============================================================
-   CARGA DE FUENTES
-============================================================ */
 async function loadValidFonts(urls) {
   const valid = [];
   for (const url of urls) {
@@ -821,19 +812,27 @@ function initViewer() {
     autoResize: true,
   });
   setTimeout(() => configureMouseControls(), 100);
+  setTimeout(() => {
+    try {
+      const controls = viewer.controls || viewer._controls;
+      if (controls && controls.addEventListener) {
+        controls.addEventListener('change', () => {
+          if (measureRedrawRAF) cancelAnimationFrame(measureRedrawRAF);
+          measureRedrawRAF = requestAnimationFrame(() => {
+            measureRedrawRAF = null;
+            drawMeasurePreview();
+          });
+        });
+      }
+    } catch (e) {}
+  }, 200);
   return viewer;
 }
 
-/* ============================================================
-   CONFIGURAR CONTROLES DE MOUSE
-============================================================ */
 function configureMouseControls() {
   if (!viewer) return;
   const controls = viewer.controls || viewer._controls;
-  if (!controls) {
-    setTimeout(configureMouseControls, 200);
-    return;
-  }
+  if (!controls) { setTimeout(configureMouseControls, 200); return; }
   try {
     controls.mouseButtons = {
       LEFT: null,
@@ -845,14 +844,9 @@ function configureMouseControls() {
     controls.enableRotate = false;
     controls.panSpeed = 1.0;
     controls.zoomSpeed = 1.2;
-  } catch (e) {
-    console.warn('No se pudieron configurar los controles:', e);
-  }
+  } catch (e) {}
 }
 
-/* ============================================================
-   SINCRONIZACIÓN DE ESTADO
-============================================================ */
 function syncLayersStateFromScene() {
   const scene = viewer?.GetScene?.();
   if (!scene) return;
@@ -889,9 +883,6 @@ function setLayersVisible(changes) {
   viewer.Render();
 }
 
-/* ============================================================
-   PANEL DE CAPAS
-============================================================ */
 function renderLayers() {
   DOM.layerList.innerHTML = '';
   if (layersState.size === 0) {
@@ -916,7 +907,6 @@ function renderLayers() {
   for (const [name, info] of entries) {
     const item = document.createElement('label');
     item.className = 'layer-item';
-
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = info.visible;
@@ -931,16 +921,13 @@ function renderLayers() {
       setLayersVisible([{ name, show: cb.checked }]);
       updateToggleAllIcon();
     });
-
     const sw = document.createElement('span');
     sw.className = 'layer-color';
     sw.style.background = numToHex(info.color);
-
     const nm = document.createElement('span');
     nm.className = 'layer-name';
     nm.textContent = name;
     nm.title = name;
-
     item.appendChild(cb);
     item.appendChild(sw);
     item.appendChild(nm);
@@ -963,9 +950,6 @@ function updateToggleAllIcon() {
   DOM.btnToggleAll.title = allVisible ? 'Ocultar todas las capas' : 'Mostrar todas las capas';
 }
 
-/* ============================================================
-   TOGGLE ALL
-============================================================ */
 DOM.btnToggleAll.addEventListener('click', () => {
   if (!viewer || layersState.size === 0) return;
   syncLayersStateFromScene();
@@ -993,9 +977,6 @@ DOM.btnToggleAll.addEventListener('click', () => {
   notificar(target ? `Mostradas ${changes.length} capa(s)` : `Ocultadas ${changes.length} capa(s)`);
 });
 
-/* ============================================================
-   UNDO
-============================================================ */
 function undoLayerChange() {
   if (layerHistory.length === 0) return false;
   const changes = layerHistory.pop();
@@ -1007,30 +988,21 @@ function undoLayerChange() {
       if (info) info.visible = c.oldVisible;
     }
     renderLayers();
-  } finally {
-    undoing = false;
-  }
+  } finally { undoing = false; }
   updateUndoUI();
   return true;
 }
 function updateUndoUI() {
   const n = layerHistory.length;
   DOM.btnUndo.disabled = n === 0;
-  if (n > 0) {
-    DOM.undoBadge.style.display = '';
-    DOM.undoBadge.textContent = String(n);
-  } else {
-    DOM.undoBadge.style.display = 'none';
-  }
+  if (n > 0) { DOM.undoBadge.style.display = ''; DOM.undoBadge.textContent = String(n); }
+  else { DOM.undoBadge.style.display = 'none'; }
 }
 DOM.btnUndo.addEventListener('click', () => {
   if (undoLayerChange()) notificar('Cambio de capa deshecho');
   else notificar('Nada para deshacer', 'warn');
 });
 
-/* ============================================================
-   FIT VIEW
-============================================================ */
 function fitView() {
   if (!viewer) return;
   const bounds = viewer.GetBounds();
@@ -1059,13 +1031,9 @@ function fitView() {
     camera.lookAt(center);
     viewer.Render();
   }
-  // Redibujar overlay tras fit
   setTimeout(() => drawMeasurePreview(), 50);
 }
 
-/* ============================================================
-   ZOOM
-============================================================ */
 function dispatchZoom(deltaY) {
   const canvas = viewer?.GetCanvas?.();
   if (!canvas) return;
@@ -1080,15 +1048,12 @@ function dispatchZoom(deltaY) {
     canvas.dispatchEvent(evt);
   } catch (e) {
     try {
-      const evt = new MouseEvent('wheel', {
-        clientX: cx, clientY: cy, bubbles: true, cancelable: true,
-      });
+      const evt = new MouseEvent('wheel', { clientX: cx, clientY: cy, bubbles: true, cancelable: true });
       Object.defineProperty(evt, 'deltaY', { value: deltaY });
       Object.defineProperty(evt, 'deltaMode', { value: 0 });
       canvas.dispatchEvent(evt);
     } catch (e2) {}
   }
-  // Redibujar overlay tras zoom
   setTimeout(() => drawMeasurePreview(), 30);
 }
 function zoomIn() { dispatchZoom(-240); }
@@ -1098,9 +1063,6 @@ DOM.btnFit.addEventListener('click', () => { if (!DOM.btnFit.disabled) fitView()
 DOM.btnZoomIn.addEventListener('click', () => { if (!DOM.btnZoomIn.disabled) zoomIn(); });
 DOM.btnZoomOut.addEventListener('click', () => { if (!DOM.btnZoomOut.disabled) zoomOut(); });
 
-/* ============================================================
-   REGEN
-============================================================ */
 function regen() {
   if (!viewer) return;
   const scene = viewer.GetScene();
@@ -1112,26 +1074,20 @@ function regen() {
 }
 DOM.btnRegen.addEventListener('click', () => { if (!DOM.btnRegen.disabled) regen(); });
 
-/* ============================================================
-   COORDENADAS (siempre en plano Z=0)
-============================================================ */
 DOM.viewerContainer.addEventListener('mousemove', (e) => {
   if (!viewer) return;
   const origin = viewer.GetOrigin();
   const camera = viewer.GetCamera();
   const canvas = viewer.GetCanvas();
   if (!origin || !camera || !canvas) return;
-
   const rect = canvas.getBoundingClientRect();
   const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
   const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   const hit = new THREE.Vector3();
   if (!raycaster.ray.intersectPlane(plane, hit)) return;
-
   DOM.statusCoords.style.display = '';
   DOM.statusX.textContent = `X: ${fmtNum(hit.x + origin.x)} m`;
   DOM.statusY.textContent = `Y: ${fmtNum(hit.y + origin.y)} m`;
@@ -1140,55 +1096,32 @@ DOM.viewerContainer.addEventListener('mouseleave', () => {
   DOM.statusCoords.style.display = 'none';
 });
 
-/* ============================================================
-   CUADRÍCULA
-============================================================ */
 function applyGrid() {
-  if (gridVisible) {
-    DOM.gridOverlay.classList.remove('oculto');
-    DOM.btnGrid.classList.add('active');
-  } else {
-    DOM.gridOverlay.classList.add('oculto');
-    DOM.btnGrid.classList.remove('active');
-  }
+  if (gridVisible) { DOM.gridOverlay.classList.remove('oculto'); DOM.btnGrid.classList.add('active'); }
+  else { DOM.gridOverlay.classList.add('oculto'); DOM.btnGrid.classList.remove('active'); }
 }
-DOM.btnGrid.addEventListener('click', () => {
-  gridVisible = !gridVisible;
-  applyGrid();
-});
+DOM.btnGrid.addEventListener('click', () => { gridVisible = !gridVisible; applyGrid(); });
 applyGrid();
 
-/* ============================================================
-   PICKING (para apagar capa)
-============================================================ */
 function pointSegDist2(px, py, x1, y1, x2, y2) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
+  const dx = x2 - x1, dy = y2 - y1;
   const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-9) {
-    const ex = px - x1, ey = py - y1;
-    return ex * ex + ey * ey;
-  }
+  if (lenSq < 1e-9) { const ex = px - x1, ey = py - y1; return ex * ex + ey * ey; }
   let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
   if (t < 0) t = 0; else if (t > 1) t = 1;
-  const cx = x1 + t * dx;
-  const cy = y1 + t * dy;
+  const cx = x1 + t * dx, cy = y1 + t * dy;
   const ex = px - cx, ey = py - cy;
   return ex * ex + ey * ey;
 }
 
 function getLayerNameFromObject(obj) {
-  let cur = obj;
-  let safety = 0;
+  let cur = obj, safety = 0;
   while (cur && safety++ < 30) {
     if (cur._dxfViewerLayer && cur._dxfViewerLayer.name) return cur._dxfViewerLayer.name;
     if (cur.userData) {
       const ud = cur.userData;
       const candidate = ud.layerName || ud.Layer || ud.layer || ud.LAYER;
-      if (candidate) {
-        if (typeof candidate === 'string') return candidate;
-        if (candidate.name) return candidate.name;
-      }
+      if (candidate) { if (typeof candidate === 'string') return candidate; if (candidate.name) return candidate.name; }
     }
     cur = cur.parent;
   }
@@ -1202,51 +1135,35 @@ function pickLayerAtPoint(clientX, clientY, threshold = 14) {
   const canvas = viewer.GetCanvas();
   if (!scene || !camera || !canvas) return null;
   try { scene.updateMatrixWorld(true); } catch (e) {}
-
   const rect = canvas.getBoundingClientRect();
-  const clickX = clientX - rect.left;
-  const clickY = clientY - rect.top;
+  const clickX = clientX - rect.left, clickY = clientY - rect.top;
   const thresh2 = threshold * threshold;
-  let bestLayer = null;
-  let bestDist2 = thresh2;
-  const halfW = rect.width * 0.5;
-  const halfH = rect.height * 0.5;
+  let bestLayer = null, bestDist2 = thresh2;
+  const halfW = rect.width * 0.5, halfH = rect.height * 0.5;
   const v = new THREE.Vector3();
   const MAX_SAMPLES = 15000;
-
   const visit = (obj) => {
     if (!obj) return;
     let anc = obj, visible = true;
-    while (anc && anc !== scene) {
-      if (anc.visible === false) { visible = false; break; }
-      anc = anc.parent;
-    }
+    while (anc && anc !== scene) { if (anc.visible === false) { visible = false; break; } anc = anc.parent; }
     if (!visible) return;
-
     const geom = obj.geometry;
     const pos = geom && geom.attributes && geom.attributes.position;
     if (pos && pos.count > 0) {
       const m = obj.matrixWorld;
       const count = pos.count;
       const project = (i) => {
-        v.fromBufferAttribute(pos, i);
-        v.applyMatrix4(m);
-        v.project(camera);
+        v.fromBufferAttribute(pos, i); v.applyMatrix4(m); v.project(camera);
         return { x: (v.x + 1) * halfW, y: (-v.y + 1) * halfH, behind: v.z > 1 };
       };
-
       if (obj.isLineSegments) {
         const segCount = Math.floor(count / 2);
         const segStep = Math.max(1, Math.ceil(segCount / MAX_SAMPLES));
         for (let s = 0; s < segCount; s += segStep) {
-          const a = project(s * 2);
-          const b = project(s * 2 + 1);
+          const a = project(s * 2), b = project(s * 2 + 1);
           if (a.behind || b.behind) continue;
           const d2 = pointSegDist2(clickX, clickY, a.x, a.y, b.x, b.y);
-          if (d2 < bestDist2) {
-            const lname = getLayerNameFromObject(obj);
-            if (lname) { bestDist2 = d2; bestLayer = lname; }
-          }
+          if (d2 < bestDist2) { const lname = getLayerNameFromObject(obj); if (lname) { bestDist2 = d2; bestLayer = lname; } }
         }
       } else if (obj.isLine) {
         const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
@@ -1255,10 +1172,7 @@ function pickLayerAtPoint(clientX, clientY, threshold = 14) {
           const p = project(i);
           if (prev && !prev.behind && !p.behind) {
             const d2 = pointSegDist2(clickX, clickY, prev.x, prev.y, p.x, p.y);
-            if (d2 < bestDist2) {
-              const lname = getLayerNameFromObject(obj);
-              if (lname) { bestDist2 = d2; bestLayer = lname; }
-            }
+            if (d2 < bestDist2) { const lname = getLayerNameFromObject(obj); if (lname) { bestDist2 = d2; bestLayer = lname; } }
           }
           prev = p;
         }
@@ -1267,13 +1181,9 @@ function pickLayerAtPoint(clientX, clientY, threshold = 14) {
         for (let i = 0; i < count; i += vStep) {
           const p = project(i);
           if (p.behind) continue;
-          const dx = p.x - clickX;
-          const dy = p.y - clickY;
+          const dx = p.x - clickX, dy = p.y - clickY;
           const d2 = dx * dx + dy * dy;
-          if (d2 < bestDist2) {
-            const lname = getLayerNameFromObject(obj);
-            if (lname) { bestDist2 = d2; bestLayer = lname; }
-          }
+          if (d2 < bestDist2) { const lname = getLayerNameFromObject(obj); if (lname) { bestDist2 = d2; bestLayer = lname; } }
         }
       }
     }
@@ -1283,117 +1193,10 @@ function pickLayerAtPoint(clientX, clientY, threshold = 14) {
   return bestLayer;
 }
 
-function pickLayersInBox(x1, y1, x2, y2) {
-  if (!viewer) return [];
-  const scene = viewer.GetScene();
-  const camera = viewer.GetCamera();
-  const canvas = viewer.GetCanvas();
-  if (!scene || !camera || !canvas) return [];
-  try { scene.updateMatrixWorld(true); } catch (e) {}
-
-  const rect = canvas.getBoundingClientRect();
-  const rx1 = Math.min(x1, x2) - rect.left;
-  const ry1 = Math.min(y1, y2) - rect.top;
-  const rx2 = Math.max(x1, x2) - rect.left;
-  const ry2 = Math.max(y1, y2) - rect.top;
-
-  const layers = new Set();
-  const halfW = rect.width * 0.5;
-  const halfH = rect.height * 0.5;
-  const v = new THREE.Vector3();
-  const MAX_SAMPLES = 15000;
-
-  const segIntersectsRect = (ax, ay, bx, by) => {
-    if ((ax >= rx1 && ax <= rx2 && ay >= ry1 && ay <= ry2) ||
-        (bx >= rx1 && bx <= rx2 && by >= ry1 && by <= ry2)) return true;
-    const ccw = (px, py, qx, qy, rx, ry) => (qy - py) * (rx - qx) - (qx - px) * (ry - qy);
-    const segInter = (p1x, p1y, p2x, p2y, p3x, p3y, p4x, p4y) => {
-      const d1 = ccw(p3x, p3y, p4x, p4y, p1x, p1y);
-      const d2 = ccw(p3x, p3y, p4x, p4y, p2x, p2y);
-      const d3 = ccw(p1x, p1y, p2x, p2y, p3x, p3y);
-      const d4 = ccw(p1x, p1y, p2x, p2y, p4x, p4y);
-      if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
-          ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
-      return false;
-    };
-    return segInter(ax, ay, bx, by, rx1, ry1, rx2, ry1) ||
-           segInter(ax, ay, bx, by, rx2, ry1, rx2, ry2) ||
-           segInter(ax, ay, bx, by, rx2, ry2, rx1, ry2) ||
-           segInter(ax, ay, bx, by, rx1, ry2, rx1, ry1);
-  };
-
-  const visit = (obj) => {
-    if (!obj) return;
-    let anc = obj, visible = true;
-    while (anc && anc !== scene) {
-      if (anc.visible === false) { visible = false; break; }
-      anc = anc.parent;
-    }
-    if (!visible) return;
-
-    const geom = obj.geometry;
-    const pos = geom && geom.attributes && geom.attributes.position;
-    if (pos && pos.count > 0) {
-      const m = obj.matrixWorld;
-      const count = pos.count;
-      const project = (i) => {
-        v.fromBufferAttribute(pos, i);
-        v.applyMatrix4(m);
-        v.project(camera);
-        return { x: (v.x + 1) * halfW, y: (-v.y + 1) * halfH, behind: v.z > 1 };
-      };
-      const addIfHit = () => {
-        const lname = getLayerNameFromObject(obj);
-        if (lname) layers.add(lname);
-      };
-
-      if (obj.isLineSegments) {
-        const segCount = Math.floor(count / 2);
-        const segStep = Math.max(1, Math.ceil(segCount / MAX_SAMPLES));
-        for (let s = 0; s < segCount; s += segStep) {
-          const a = project(s * 2);
-          const b = project(s * 2 + 1);
-          if (a.behind || b.behind) continue;
-          if (segIntersectsRect(a.x, a.y, b.x, b.y)) { addIfHit(); break; }
-        }
-      } else if (obj.isLine) {
-        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
-        let prev = null;
-        for (let i = 0; i < count; i += vStep) {
-          const p = project(i);
-          if (prev && !prev.behind && !p.behind) {
-            if (segIntersectsRect(prev.x, prev.y, p.x, p.y)) { addIfHit(); break; }
-          }
-          prev = p;
-        }
-      } else {
-        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
-        for (let i = 0; i < count; i += vStep) {
-          const p = project(i);
-          if (p.behind) continue;
-          if (p.x >= rx1 && p.x <= rx2 && p.y >= ry1 && p.y <= ry2) { addIfHit(); break; }
-        }
-      }
-    }
-    if (obj.children) for (const c of obj.children) visit(c);
-  };
-  for (const c of scene.children) visit(c);
-  return [...layers];
-}
-
-/* ============================================================
-   SNAPPING MEJORADO
-   - Proyección de todos los puntos al plano Z=0
-   - Intersecciones reales y ficticias (extensión)
-============================================================ */
 function projectWorldToScreen(x, y, z, camera, rect) {
   const v = new THREE.Vector3(x, y, z);
   v.project(camera);
-  return {
-    x: (v.x + 1) * 0.5 * rect.width,
-    y: (-v.y + 1) * 0.5 * rect.height,
-    behind: v.z > 1,
-  };
+  return { x: (v.x + 1) * 0.5 * rect.width, y: (-v.y + 1) * 0.5 * rect.height, behind: v.z > 1 };
 }
 
 function projectScreenToWorld(clientX, clientY, camera, canvas, origin) {
@@ -1415,69 +1218,40 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
   const canvas = viewer.GetCanvas();
   if (!scene || !camera || !canvas) return null;
   try { scene.updateMatrixWorld(true); } catch (e) {}
-
   const rect = canvas.getBoundingClientRect();
-  const clickX = clientX - rect.left;
-  const clickY = clientY - rect.top;
+  const clickX = clientX - rect.left, clickY = clientY - rect.top;
   const thresh2 = threshold * threshold;
-
-  let best = null;
-  let bestDist2 = thresh2;
-  const halfW = rect.width * 0.5;
-  const halfH = rect.height * 0.5;
+  let best = null, bestDist2 = thresh2;
+  const halfW = rect.width * 0.5, halfH = rect.height * 0.5;
   const v = new THREE.Vector3();
   const MAX_SAMPLES = 8000;
-
+  const allSegments = [];
   const consider = (x, y, z, type) => {
-    // Forzar Z=0 para mediciones 2D
     const p = projectWorldToScreen(x, y, 0, camera, rect);
     if (p.behind) return;
-    const dx = p.x - clickX;
-    const dy = p.y - clickY;
+    const dx = p.x - clickX, dy = p.y - clickY;
     const d2 = dx * dx + dy * dy;
-    if (d2 < bestDist2) {
-      bestDist2 = d2;
-      best = { x, y, z: 0, screenX: p.x, screenY: p.y, type };
-    }
+    if (d2 < bestDist2) { bestDist2 = d2; best = { x, y, z: 0, screenX: p.x, screenY: p.y, type }; }
   };
-
-  // Recolectar todos los segmentos para intersecciones
-  const allSegments = [];
-
   const visit = (obj) => {
     if (!obj) return;
     let anc = obj, visible = true;
-    while (anc && anc !== scene) {
-      if (anc.visible === false) { visible = false; break; }
-      anc = anc.parent;
-    }
+    while (anc && anc !== scene) { if (anc.visible === false) { visible = false; break; } anc = anc.parent; }
     if (!visible) return;
-
     const geom = obj.geometry;
     const pos = geom && geom.attributes && geom.attributes.position;
     if (pos && pos.count > 0) {
       const m = obj.matrixWorld;
       const count = pos.count;
-      const toWorld = (i) => {
-        v.fromBufferAttribute(pos, i);
-        v.applyMatrix4(m);
-        return { x: v.x, y: v.y, z: 0 };
-      };
-
+      const toWorld = (i) => { v.fromBufferAttribute(pos, i); v.applyMatrix4(m); return { x: v.x, y: v.y, z: 0 }; };
       if (obj.isLineSegments) {
         const segCount = Math.floor(count / 2);
         const segStep = Math.max(1, Math.ceil(segCount / MAX_SAMPLES));
         for (let s = 0; s < segCount; s += segStep) {
-          const a = toWorld(s * 2);
-          const b = toWorld(s * 2 + 1);
+          const a = toWorld(s * 2), b = toWorld(s * 2 + 1);
           allSegments.push({ a, b });
-          if (measureSnaps.has('endpoint')) {
-            consider(a.x, a.y, 0, 'endpoint');
-            consider(b.x, b.y, 0, 'endpoint');
-          }
-          if (measureSnaps.has('midpoint')) {
-            consider((a.x + b.x) / 2, (a.y + b.y) / 2, 0, 'midpoint');
-          }
+          if (measureSnaps.has('endpoint')) { consider(a.x, a.y, 0, 'endpoint'); consider(b.x, b.y, 0, 'endpoint'); }
+          if (measureSnaps.has('midpoint')) consider((a.x + b.x) / 2, (a.y + b.y) / 2, 0, 'midpoint');
           if (measureSnaps.has('nearest')) {
             const pa = projectWorldToScreen(a.x, a.y, 0, camera, rect);
             const pb = projectWorldToScreen(b.x, b.y, 0, camera, rect);
@@ -1486,19 +1260,9 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
               const lenSq = dx * dx + dy * dy;
               let t = lenSq > 1e-9 ? ((clickX - pa.x) * dx + (clickY - pa.y) * dy) / lenSq : 0;
               t = Math.max(0, Math.min(1, t));
-              const sx = pa.x + t * dx;
-              const sy = pa.y + t * dy;
+              const sx = pa.x + t * dx, sy = pa.y + t * dy;
               const d2b = (clickX - sx) ** 2 + (clickY - sy) ** 2;
-              if (d2b < bestDist2) {
-                bestDist2 = d2b;
-                best = {
-                  x: a.x + t * (b.x - a.x),
-                  y: a.y + t * (b.y - a.y),
-                  z: 0,
-                  screenX: sx, screenY: sy,
-                  type: 'nearest',
-                };
-              }
+              if (d2b < bestDist2) { bestDist2 = d2b; best = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y), z: 0, screenX: sx, screenY: sy, type: 'nearest' }; }
             }
           }
         }
@@ -1510,9 +1274,7 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
           if (measureSnaps.has('endpoint')) consider(p.x, p.y, 0, 'endpoint');
           if (prev) {
             allSegments.push({ a: prev, b: p });
-            if (measureSnaps.has('midpoint')) {
-              consider((prev.x + p.x) / 2, (prev.y + p.y) / 2, 0, 'midpoint');
-            }
+            if (measureSnaps.has('midpoint')) consider((prev.x + p.x) / 2, (prev.y + p.y) / 2, 0, 'midpoint');
           }
           prev = p;
         }
@@ -1523,7 +1285,6 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
           if (measureSnaps.has('endpoint')) consider(p.x, p.y, 0, 'endpoint');
         }
       } else {
-        // Mesh / otros
         const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
         for (let i = 0; i < count; i += vStep) {
           const p = toWorld(i);
@@ -1540,45 +1301,35 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
   };
   for (const c of scene.children) visit(c);
 
-  // Intersecciones: buscar pares de segmentos que se crucen cerca del cursor
   if (measureSnaps.has('intersection') && allSegments.length > 0) {
-    const MAX_PAIRS = 500; // límite de pares a evaluar
-    let pairsEvaluated = 0;
-    for (let i = 0; i < allSegments.length && pairsEvaluated < MAX_PAIRS; i++) {
-      for (let j = i + 1; j < allSegments.length && pairsEvaluated < MAX_PAIRS; j++) {
-        pairsEvaluated++;
-        const s1 = allSegments[i], s2 = allSegments[j];
-        const ix = segIntersectWorld(s1.a, s1.b, s2.a, s2.b);
+    const MAX_PAIRS = 400;
+    let pairs = 0;
+    for (let i = 0; i < allSegments.length && pairs < MAX_PAIRS; i++) {
+      for (let j = i + 1; j < allSegments.length && pairs < MAX_PAIRS; j++) {
+        pairs++;
+        const ix = segIntersectWorld(allSegments[i].a, allSegments[i].b, allSegments[j].a, allSegments[j].b);
         if (ix) {
           const p = projectWorldToScreen(ix.x, ix.y, 0, camera, rect);
           if (p.behind) continue;
           const d2 = (p.x - clickX) ** 2 + (p.y - clickY) ** 2;
-          if (d2 < bestDist2) {
-            bestDist2 = d2;
-            best = { x: ix.x, y: ix.y, z: 0, screenX: p.x, screenY: p.y, type: 'intersection' };
-          }
+          if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: p.x, screenY: p.y, type: 'intersection' }; }
         }
       }
     }
   }
 
-  // Intersección ficticia (extensión de líneas)
   if (measureSnaps.has('fictitious') && allSegments.length > 0 && !best) {
     const MAX_PAIRS = 300;
-    let pairsEvaluated = 0;
-    for (let i = 0; i < allSegments.length && pairsEvaluated < MAX_PAIRS; i++) {
-      for (let j = i + 1; j < allSegments.length && pairsEvaluated < MAX_PAIRS; j++) {
-        pairsEvaluated++;
-        const s1 = allSegments[i], s2 = allSegments[j];
-        const ix = segIntersectExtended(s1.a, s1.b, s2.a, s2.b);
+    let pairs = 0;
+    for (let i = 0; i < allSegments.length && pairs < MAX_PAIRS; i++) {
+      for (let j = i + 1; j < allSegments.length && pairs < MAX_PAIRS; j++) {
+        pairs++;
+        const ix = segIntersectExtended(allSegments[i].a, allSegments[i].b, allSegments[j].a, allSegments[j].b);
         if (ix) {
           const p = projectWorldToScreen(ix.x, ix.y, 0, camera, rect);
           if (p.behind) continue;
           const d2 = (p.x - clickX) ** 2 + (p.y - clickY) ** 2;
-          if (d2 < bestDist2) {
-            bestDist2 = d2;
-            best = { x: ix.x, y: ix.y, z: 0, screenX: p.x, screenY: p.y, type: 'fictitious' };
-          }
+          if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: p.x, screenY: p.y, type: 'fictitious' }; }
         }
       }
     }
@@ -1605,15 +1356,11 @@ function segIntersectExtended(a1, a2, b1, b2) {
   if (Math.abs(denom) < 1e-12) return null;
   const t = ((b1.x - a1.x) * d2y - (b1.y - a1.y) * d2x) / denom;
   const u = ((b1.x - a1.x) * d1y - (b1.y - a1.y) * d1x) / denom;
-  // Permitir extensión: t y u pueden estar fuera de [0,1], pero limitar a un rango razonable
   const margin = 2.0;
   if (t < -margin || t > 1 + margin || u < -margin || u > 1 + margin) return null;
   return { x: a1.x + t * d1x, y: a1.y + t * d1y };
 }
 
-/* ============================================================
-   OVERLAY DE MEDICIÓN
-============================================================ */
 function getOverlayCtx() {
   const c = DOM.measureOverlay;
   const rect = DOM.canvasContainer.getBoundingClientRect();
@@ -1633,98 +1380,44 @@ function getOverlayCtx() {
 function drawMeasurePreview() {
   const { ctx, w, h } = getOverlayCtx();
   if (!measureMode || measurePoints.length === 0) return;
-
   const pts = measurePoints;
   const last = pts[pts.length - 1];
-
   let curX, curY;
-  if (lastSnapPoint) {
-    curX = lastSnapPoint.screenX;
-    curY = lastSnapPoint.screenY;
-  } else {
-    const rect = DOM.canvasContainer.getBoundingClientRect();
-    curX = mouseScreen.x - rect.left;
-    curY = mouseScreen.y - rect.top;
-  }
-
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = '#2f81f7';
-  ctx.fillStyle = '#2f81f7';
-  ctx.setLineDash([6, 4]);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
+  if (lastSnapPoint) { curX = lastSnapPoint.screenX; curY = lastSnapPoint.screenY; }
+  else { const rect = DOM.canvasContainer.getBoundingClientRect(); curX = mouseScreen.x - rect.left; curY = mouseScreen.y - rect.top; }
+  ctx.lineWidth = 2; ctx.strokeStyle = '#2f81f7'; ctx.fillStyle = '#2f81f7';
+  ctx.setLineDash([6, 4]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (measureTool === 'distance') {
     const p0 = pts[0];
-    if (p0._sx !== undefined) {
-      ctx.beginPath();
-      ctx.moveTo(p0._sx, p0._sy);
-      ctx.lineTo(curX, curY);
-      ctx.stroke();
-    }
+    if (p0._sx !== undefined) { ctx.beginPath(); ctx.moveTo(p0._sx, p0._sy); ctx.lineTo(curX, curY); ctx.stroke(); }
   } else if (measureTool === 'polyline') {
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i], b = pts[i+1];
-      if (a._sx !== undefined && b._sx !== undefined) {
-        ctx.beginPath();
-        ctx.moveTo(a._sx, a._sy);
-        ctx.lineTo(b._sx, b._sy);
-        ctx.stroke();
-      }
+      if (a._sx !== undefined && b._sx !== undefined) { ctx.beginPath(); ctx.moveTo(a._sx, a._sy); ctx.lineTo(b._sx, b._sy); ctx.stroke(); }
     }
-    if (last._sx !== undefined) {
-      ctx.beginPath();
-      ctx.moveTo(last._sx, last._sy);
-      ctx.lineTo(curX, curY);
-      ctx.stroke();
-    }
+    if (last._sx !== undefined) { ctx.beginPath(); ctx.moveTo(last._sx, last._sy); ctx.lineTo(curX, curY); ctx.stroke(); }
   } else if (measureTool === 'area') {
     if (pts.length >= 2) {
-      ctx.beginPath();
-      ctx.moveTo(pts[0]._sx, pts[0]._sy);
-      for (let i = 1; i < pts.length; i++) {
-        ctx.lineTo(pts[i]._sx, pts[i]._sy);
-      }
-      ctx.lineTo(curX, curY);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(47, 129, 247, 0.12)';
-      ctx.fill();
-      ctx.strokeStyle = '#2f81f7';
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pts[0]._sx, pts[0]._sy);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]._sx, pts[i]._sy);
+      ctx.lineTo(curX, curY); ctx.closePath();
+      ctx.fillStyle = 'rgba(47, 129, 247, 0.12)'; ctx.fill();
+      ctx.strokeStyle = '#2f81f7'; ctx.stroke();
     }
   } else if (measureTool === 'angle') {
     if (pts.length === 1) {
       const p0 = pts[0];
-      if (p0._sx !== undefined) {
-        ctx.beginPath();
-        ctx.moveTo(p0._sx, p0._sy);
-        ctx.lineTo(curX, curY);
-        ctx.stroke();
-      }
+      if (p0._sx !== undefined) { ctx.beginPath(); ctx.moveTo(p0._sx, p0._sy); ctx.lineTo(curX, curY); ctx.stroke(); }
     } else if (pts.length >= 2) {
       const p0 = pts[0], p1 = pts[1];
-      if (p0._sx !== undefined && p1._sx !== undefined) {
-        ctx.beginPath();
-        ctx.moveTo(p0._sx, p0._sy);
-        ctx.lineTo(p1._sx, p1._sy);
-        ctx.lineTo(curX, curY);
-        ctx.stroke();
-      }
+      if (p0._sx !== undefined && p1._sx !== undefined) { ctx.beginPath(); ctx.moveTo(p0._sx, p0._sy); ctx.lineTo(p1._sx, p1._sy); ctx.lineTo(curX, curY); ctx.stroke(); }
     }
   }
-
   ctx.setLineDash([]);
 }
 
-/* ============================================================
-   HERRAMIENTA DE MEDICIÓN
-============================================================ */
 function enterMeasureMode() {
-  if (clickHideMode) {
-    clickHideMode = false;
-    DOM.btnClickHide.classList.remove('active', 'active-danger');
-    DOM.canvasContainer.classList.remove('mode-clickhide');
-  }
+  if (clickHideMode) { clickHideMode = false; DOM.btnClickHide.classList.remove('active', 'active-danger'); DOM.canvasContainer.classList.remove('mode-clickhide'); }
   if (pdfAreaMode) exitPdfAreaMode();
   measureMode = true;
   DOM.measurePanel.classList.add('activo');
@@ -1733,7 +1426,6 @@ function enterMeasureMode() {
   clearMeasure();
   notificar('Modo medición activo. Elegí una herramienta y hacé clic.');
 }
-
 function exitMeasureMode() {
   measureMode = false;
   DOM.measurePanel.classList.remove('activo');
@@ -1744,23 +1436,15 @@ function exitMeasureMode() {
   DOM.measureResult.innerHTML = '<span class="mr-hint">Elegí una herramienta y hacé clic sobre el dibujo.</span>';
   drawMeasurePreview();
 }
-
 function clearMeasure() {
-  measurePoints = [];
-  lastSnapPoint = null;
+  measurePoints = []; lastSnapPoint = null;
   document.querySelectorAll('.measure-point').forEach(el => el.remove());
   DOM.snapMarker.classList.add('oculto');
   drawMeasurePreview();
 }
-
-DOM.btnMeasure.addEventListener('click', () => {
-  if (measureMode) exitMeasureMode();
-  else enterMeasureMode();
-});
-
+DOM.btnMeasure.addEventListener('click', () => { if (measureMode) exitMeasureMode(); else enterMeasureMode(); });
 DOM.btnMeasureClose.addEventListener('click', () => exitMeasureMode());
 
-/* Herramientas */
 document.querySelectorAll('.measure-tool-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.measure-tool-btn').forEach(b => b.classList.remove('active'));
@@ -1770,21 +1454,13 @@ document.querySelectorAll('.measure-tool-btn').forEach(btn => {
     updateMeasureHint();
   });
 });
-
-/* Snaps */
 document.querySelectorAll('.snap-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const snap = btn.dataset.snap;
-    if (measureSnaps.has(snap)) {
-      measureSnaps.delete(snap);
-      btn.classList.remove('active');
-    } else {
-      measureSnaps.add(snap);
-      btn.classList.add('active');
-    }
+    if (measureSnaps.has(snap)) { measureSnaps.delete(snap); btn.classList.remove('active'); }
+    else { measureSnaps.add(snap); btn.classList.add('active'); }
   });
 });
-
 function updateMeasureHint() {
   const hints = {
     distance: 'Hacé clic en dos puntos para medir la distancia.',
@@ -1792,65 +1468,37 @@ function updateMeasureHint() {
     area: 'Hacé clic en los vértices del polígono. Doble clic o ESC para cerrar y calcular área.',
     angle: 'Hacé clic en tres puntos: inicial, vértice y final.',
   };
-  if (measurePoints.length === 0) {
-    DOM.measureResult.innerHTML = `<span class="mr-hint">${hints[measureTool]}</span>`;
-  }
+  if (measurePoints.length === 0) { DOM.measureResult.innerHTML = `<span class="mr-hint">${hints[measureTool]}</span>`; }
 }
 
-/* ============================================================
-   MARCADOR DE SNAP Y PREVISUALIZACIÓN EN VIVO
-============================================================ */
 DOM.viewerContainer.addEventListener('mousemove', (e) => {
   mouseScreen = { x: e.clientX, y: e.clientY };
   if (!measureMode) return;
   const snap = findSnapPoint(e.clientX, e.clientY);
-  if (snap) {
-    lastSnapPoint = snap;
-    DOM.snapMarker.classList.remove('oculto');
-    DOM.snapMarker.style.left = snap.screenX + 'px';
-    DOM.snapMarker.style.top = snap.screenY + 'px';
-  } else {
-    lastSnapPoint = null;
-    DOM.snapMarker.classList.add('oculto');
-  }
+  if (snap) { lastSnapPoint = snap; DOM.snapMarker.classList.remove('oculto'); DOM.snapMarker.style.left = snap.screenX + 'px'; DOM.snapMarker.style.top = snap.screenY + 'px'; }
+  else { lastSnapPoint = null; DOM.snapMarker.classList.add('oculto'); }
   drawMeasurePreview();
-  if (measurePoints.length > 0) {
-    updateMeasureResultLive();
-  }
+  if (measurePoints.length > 0) updateMeasureResultLive();
 });
 
-/* ============================================================
-   CLICK EN MODO MEDICIÓN
-============================================================ */
 DOM.viewerContainer.addEventListener('click', (e) => {
   if (!measureMode) return;
-  e.stopPropagation();
-  e.preventDefault();
-
+  e.stopPropagation(); e.preventDefault();
   const snap = findSnapPoint(e.clientX, e.clientY);
   let worldPoint, screenX, screenY;
-  if (snap) {
-    worldPoint = { x: snap.x, y: snap.y, z: 0 };
-    screenX = snap.screenX;
-    screenY = snap.screenY;
-  } else {
-    const camera = viewer.GetCamera();
-    const canvas = viewer.GetCanvas();
-    const origin = viewer.GetOrigin();
+  if (snap) { worldPoint = { x: snap.x, y: snap.y, z: 0 }; screenX = snap.screenX; screenY = snap.screenY; }
+  else {
+    const camera = viewer.GetCamera(), canvas = viewer.GetCanvas(), origin = viewer.GetOrigin();
     if (!camera || !canvas || !origin) return;
     const wp = projectScreenToWorld(e.clientX, e.clientY, camera, canvas, origin);
     if (!wp) return;
     worldPoint = wp;
     const cRect = DOM.canvasContainer.getBoundingClientRect();
-    screenX = e.clientX - cRect.left;
-    screenY = e.clientY - cRect.top;
+    screenX = e.clientX - cRect.left; screenY = e.clientY - cRect.top;
   }
-
-  worldPoint._sx = screenX;
-  worldPoint._sy = screenY;
+  worldPoint._sx = screenX; worldPoint._sy = screenY;
   measurePoints.push(worldPoint);
   addMeasurePointVisual(screenX, screenY);
-
   updateMeasureResult();
   drawMeasurePreview();
 }, true);
@@ -1858,8 +1506,7 @@ DOM.viewerContainer.addEventListener('click', (e) => {
 function addMeasurePointVisual(sx, sy) {
   const el = document.createElement('div');
   el.className = 'measure-point';
-  el.style.left = sx + 'px';
-  el.style.top = sy + 'px';
+  el.style.left = sx + 'px'; el.style.top = sy + 'px';
   DOM.canvasContainer.appendChild(el);
 }
 
@@ -1870,46 +1517,27 @@ function updateMeasureResult() {
     const dx = measurePoints[1].x - measurePoints[0].x;
     const dy = measurePoints[1].y - measurePoints[0].y;
     const ang = Math.atan2(dy, dx) * 180 / Math.PI;
-    DOM.measureResult.innerHTML =
-      `<span class="mr-label">Distancia:</span> <span class="mr-value">${d.toFixed(3)} m</span><br>` +
-      `<span class="mr-label">ΔX:</span> ${dx.toFixed(3)} m · <span class="mr-label">ΔY:</span> ${dy.toFixed(3)} m<br>` +
-      `<span class="mr-label">Ángulo:</span> ${ang.toFixed(2)}°`;
+    DOM.measureResult.innerHTML = `<span class="mr-label">Distancia:</span> <span class="mr-value">${d.toFixed(3)} m</span><br><span class="mr-label">ΔX:</span> ${dx.toFixed(3)} m · <span class="mr-label">ΔY:</span> ${dy.toFixed(3)} m<br><span class="mr-label">Ángulo:</span> ${ang.toFixed(2)}°`;
   } else if (measureTool === 'polyline' && n >= 2) {
     let total = 0;
     for (let i = 0; i < n - 1; i++) total += dist2d(measurePoints[i], measurePoints[i + 1]);
-    DOM.measureResult.innerHTML =
-      `<span class="mr-label">Longitud total:</span> <span class="mr-value">${total.toFixed(3)} m</span><br>` +
-      `<span class="mr-label">Vértices:</span> ${n}`;
+    DOM.measureResult.innerHTML = `<span class="mr-label">Longitud total:</span> <span class="mr-value">${total.toFixed(3)} m</span><br><span class="mr-label">Vértices:</span> ${n}`;
   } else if (measureTool === 'area' && n >= 3) {
     let area = 0;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      area += measurePoints[i].x * measurePoints[j].y;
-      area -= measurePoints[j].x * measurePoints[i].y;
-    }
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; area += measurePoints[i].x * measurePoints[j].y; area -= measurePoints[j].x * measurePoints[i].y; }
     area = Math.abs(area) / 2;
     let perim = 0;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      perim += dist2d(measurePoints[i], measurePoints[j]);
-    }
-    DOM.measureResult.innerHTML =
-      `<span class="mr-label">Área:</span> <span class="mr-value">${area.toFixed(3)} m²</span><br>` +
-      `<span class="mr-label">Perímetro:</span> ${perim.toFixed(3)} m<br>` +
-      `<span class="mr-label">Vértices:</span> ${n}`;
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; perim += dist2d(measurePoints[i], measurePoints[j]); }
+    DOM.measureResult.innerHTML = `<span class="mr-label">Área:</span> <span class="mr-value">${area.toFixed(3)} m²</span><br><span class="mr-label">Perímetro:</span> ${perim.toFixed(3)} m<br><span class="mr-label">Vértices:</span> ${n}`;
   } else if (measureTool === 'angle' && n === 3) {
     const v1 = { x: measurePoints[0].x - measurePoints[1].x, y: measurePoints[0].y - measurePoints[1].y };
     const v2 = { x: measurePoints[2].x - measurePoints[1].x, y: measurePoints[2].y - measurePoints[1].y };
     const dot = v1.x * v2.x + v1.y * v2.y;
-    const mag1 = Math.hypot(v1.x, v1.y);
-    const mag2 = Math.hypot(v2.x, v2.y);
+    const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
     const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
     const ang = Math.acos(cos) * 180 / Math.PI;
-    DOM.measureResult.innerHTML =
-      `<span class="mr-label">Ángulo:</span> <span class="mr-value">${ang.toFixed(3)}°</span>`;
-  } else {
-    updateMeasureHint();
-  }
+    DOM.measureResult.innerHTML = `<span class="mr-label">Ángulo:</span> <span class="mr-value">${ang.toFixed(3)}°</span>`;
+  } else { updateMeasureHint(); }
 }
 
 function updateMeasureResultLive() {
@@ -1917,89 +1545,54 @@ function updateMeasureResultLive() {
   if (n === 0) return;
   const last = measurePoints[n - 1];
   let curPoint = null;
-  if (lastSnapPoint) {
-    curPoint = { x: lastSnapPoint.x, y: lastSnapPoint.y, z: 0 };
-  } else {
-    const camera = viewer.GetCamera();
-    const canvas = viewer.GetCanvas();
-    const origin = viewer.GetOrigin();
+  if (lastSnapPoint) curPoint = { x: lastSnapPoint.x, y: lastSnapPoint.y, z: 0 };
+  else {
+    const camera = viewer.GetCamera(), canvas = viewer.GetCanvas(), origin = viewer.GetOrigin();
     if (!camera || !canvas || !origin) return;
     curPoint = projectScreenToWorld(mouseScreen.x, mouseScreen.y, camera, canvas, origin);
     if (!curPoint) return;
   }
-
   if (measureTool === 'distance' && n === 1) {
     const d = dist2d(measurePoints[0], curPoint);
-    const dx = curPoint.x - measurePoints[0].x;
-    const dy = curPoint.y - measurePoints[0].y;
+    const dx = curPoint.x - measurePoints[0].x, dy = curPoint.y - measurePoints[0].y;
     const ang = Math.atan2(dy, dx) * 180 / Math.PI;
-    DOM.measureResult.innerHTML =
-      `<span class="mr-label">Distancia:</span> <span class="mr-value">${d.toFixed(3)} m</span><br>` +
-      `<span class="mr-label">ΔX:</span> ${dx.toFixed(3)} m · <span class="mr-label">ΔY:</span> ${dy.toFixed(3)} m<br>` +
-      `<span class="mr-label">Ángulo:</span> ${ang.toFixed(2)}°`;
+    DOM.measureResult.innerHTML = `<span class="mr-label">Distancia:</span> <span class="mr-value">${d.toFixed(3)} m</span><br><span class="mr-label">ΔX:</span> ${dx.toFixed(3)} m · <span class="mr-label">ΔY:</span> ${dy.toFixed(3)} m<br><span class="mr-label">Ángulo:</span> ${ang.toFixed(2)}°`;
   } else if (measureTool === 'polyline' && n >= 1) {
     let total = 0;
     for (let i = 0; i < n - 1; i++) total += dist2d(measurePoints[i], measurePoints[i + 1]);
     total += dist2d(last, curPoint);
-    DOM.measureResult.innerHTML =
-      `<span class="mr-label">Longitud total:</span> <span class="mr-value">${total.toFixed(3)} m</span><br>` +
-      `<span class="mr-label">Vértices:</span> ${n} (+ cursor)`;
+    DOM.measureResult.innerHTML = `<span class="mr-label">Longitud total:</span> <span class="mr-value">${total.toFixed(3)} m</span><br><span class="mr-label">Vértices:</span> ${n} (+ cursor)`;
   } else if (measureTool === 'area' && n >= 1) {
     const pts = [...measurePoints, curPoint];
     let area = 0;
-    for (let i = 0; i < pts.length; i++) {
-      const j = (i + 1) % pts.length;
-      area += pts[i].x * pts[j].y;
-      area -= pts[j].x * pts[i].y;
-    }
+    for (let i = 0; i < pts.length; i++) { const j = (i + 1) % pts.length; area += pts[i].x * pts[j].y; area -= pts[j].x * pts[i].y; }
     area = Math.abs(area) / 2;
     let perim = 0;
-    for (let i = 0; i < pts.length; i++) {
-      const j = (i + 1) % pts.length;
-      perim += dist2d(pts[i], pts[j]);
-    }
-    DOM.measureResult.innerHTML =
-      `<span class="mr-label">Área (preliminar):</span> <span class="mr-value">${area.toFixed(3)} m²</span><br>` +
-      `<span class="mr-label">Perímetro:</span> ${perim.toFixed(3)} m<br>` +
-      `<span class="mr-label">Vértices:</span> ${n} (+ cursor)`;
+    for (let i = 0; i < pts.length; i++) { const j = (i + 1) % pts.length; perim += dist2d(pts[i], pts[j]); }
+    DOM.measureResult.innerHTML = `<span class="mr-label">Área (preliminar):</span> <span class="mr-value">${area.toFixed(3)} m²</span><br><span class="mr-label">Perímetro:</span> ${perim.toFixed(3)} m<br><span class="mr-label">Vértices:</span> ${n} (+ cursor)`;
   } else if (measureTool === 'angle' && n >= 1) {
     if (n === 1) {
       const d = dist2d(measurePoints[0], curPoint);
-      DOM.measureResult.innerHTML =
-        `<span class="mr-label">Distancia al vértice:</span> <span class="mr-value">${d.toFixed(3)} m</span><br>` +
-        `<span class="mr-hint">Clic para fijar el vértice.</span>`;
+      DOM.measureResult.innerHTML = `<span class="mr-label">Distancia al vértice:</span> <span class="mr-value">${d.toFixed(3)} m</span><br><span class="mr-hint">Clic para fijar el vértice.</span>`;
     } else if (n === 2) {
       const v1 = { x: measurePoints[0].x - measurePoints[1].x, y: measurePoints[0].y - measurePoints[1].y };
       const v2 = { x: curPoint.x - measurePoints[1].x, y: curPoint.y - measurePoints[1].y };
       const dot = v1.x * v2.x + v1.y * v2.y;
-      const mag1 = Math.hypot(v1.x, v1.y);
-      const mag2 = Math.hypot(v2.x, v2.y);
+      const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
       const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
       const ang = Math.acos(cos) * 180 / Math.PI;
-      DOM.measureResult.innerHTML =
-        `<span class="mr-label">Ángulo (preliminar):</span> <span class="mr-value">${ang.toFixed(3)}°</span><br>` +
-        `<span class="mr-hint">Clic para fijar el punto final.</span>`;
+      DOM.measureResult.innerHTML = `<span class="mr-label">Ángulo (preliminar):</span> <span class="mr-value">${ang.toFixed(3)}°</span><br><span class="mr-hint">Clic para fijar el punto final.</span>`;
     }
   }
 }
 
-function dist2d(a, b) {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
+function dist2d(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
 
-/* Doble clic o ESC para cerrar polilínea/área */
 DOM.viewerContainer.addEventListener('dblclick', (e) => {
   if (!measureMode) return;
-  if (measureTool === 'polyline' || measureTool === 'area') {
-    e.stopPropagation();
-    e.preventDefault();
-    updateMeasureResult();
-  }
+  if (measureTool === 'polyline' || measureTool === 'area') { e.stopPropagation(); e.preventDefault(); updateMeasureResult(); }
 });
 
-/* ============================================================
-   MODO APAGAR CAPA
-============================================================ */
 DOM.btnClickHide.addEventListener('click', () => {
   if (DOM.btnClickHide.disabled) return;
   if (pdfAreaMode) exitPdfAreaMode();
@@ -2011,22 +1604,18 @@ DOM.btnClickHide.addEventListener('click', () => {
   if (clickHideMode) notificar('Clic sobre un objeto o arrastrá un cuadro para apagar su capa');
 });
 
-let selState = null;
-let selRectEl = null;
-
+let selState = null, selRectEl = null;
 DOM.viewerContainer.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   if (!clickHideMode && !pdfAreaMode && !measureMode) return;
   if (measureMode) return;
-  e.stopPropagation();
-  e.preventDefault();
+  e.stopPropagation(); e.preventDefault();
   selState = { startX: e.clientX, startY: e.clientY, moved: false };
 }, true);
 
 document.addEventListener('pointermove', (e) => {
   if (!selState) return;
-  const dx = e.clientX - selState.startX;
-  const dy = e.clientY - selState.startY;
+  const dx = e.clientX - selState.startX, dy = e.clientY - selState.startY;
   if (!selState.moved && Math.hypot(dx, dy) > 6) {
     selState.moved = true;
     selRectEl = document.createElement('div');
@@ -2034,38 +1623,28 @@ document.addEventListener('pointermove', (e) => {
     document.body.appendChild(selRectEl);
   }
   if (selState.moved && selRectEl) {
-    const x1 = Math.min(selState.startX, e.clientX);
-    const y1 = Math.min(selState.startY, e.clientY);
-    const x2 = Math.max(selState.startX, e.clientX);
-    const y2 = Math.max(selState.startY, e.clientY);
-    selRectEl.style.left = x1 + 'px';
-    selRectEl.style.top = y1 + 'px';
-    selRectEl.style.width = (x2 - x1) + 'px';
-    selRectEl.style.height = (y2 - y1) + 'px';
+    const x1 = Math.min(selState.startX, e.clientX), y1 = Math.min(selState.startY, e.clientY);
+    const x2 = Math.max(selState.startX, e.clientX), y2 = Math.max(selState.startY, e.clientY);
+    selRectEl.style.left = x1 + 'px'; selRectEl.style.top = y1 + 'px';
+    selRectEl.style.width = (x2 - x1) + 'px'; selRectEl.style.height = (y2 - y1) + 'px';
   }
 }, true);
 
 document.addEventListener('pointerup', (e) => {
   if (!selState) return;
-  const start = selState;
-  selState = null;
+  const start = selState; selState = null;
   if (selRectEl) { selRectEl.remove(); selRectEl = null; }
   if (e.button !== 0) return;
-
   if (pdfAreaMode) {
     if (!start.moved) { notificar('Arrastrá un rectángulo para definir el área', 'warn'); return; }
-    const x1 = Math.min(start.startX, e.clientX);
-    const y1 = Math.min(start.startY, e.clientY);
-    const x2 = Math.max(start.startX, e.clientX);
-    const y2 = Math.max(start.startY, e.clientY);
+    const x1 = Math.min(start.startX, e.clientX), y1 = Math.min(start.startY, e.clientY);
+    const x2 = Math.max(start.startX, e.clientX), y2 = Math.max(start.startY, e.clientY);
     exitPdfAreaMode();
     generatePdfFromRegion(x1, y1, x2 - x1, y2 - y1);
     return;
   }
-
   if (!clickHideMode) return;
   syncLayersStateFromScene();
-
   if (!start.moved) {
     const lname = pickLayerAtPoint(e.clientX, e.clientY);
     if (!lname) { notificar('No se encontró objeto aquí', 'warn'); return; }
@@ -2074,11 +1653,7 @@ document.addEventListener('pointerup', (e) => {
     if (!info.visible) { notificar(`La capa "${lname}" ya está oculta`, 'warn'); return; }
     info.visible = false;
     setLayersVisible([{ name: lname, show: false }]);
-    if (!undoing) {
-      layerHistory.push([{ name: lname, oldVisible: true, newVisible: false }]);
-      if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
-      updateUndoUI();
-    }
+    if (!undoing) { layerHistory.push([{ name: lname, oldVisible: true, newVisible: false }]); if (layerHistory.length > MAX_HISTORY) layerHistory.shift(); updateUndoUI(); }
     renderLayers();
     notificar(`Capa apagada: ${lname}`);
   } else {
@@ -2093,19 +1668,12 @@ document.addEventListener('pointerup', (e) => {
     }
     if (changes.length === 0) { notificar('Las capas del cuadro ya estaban ocultas', 'warn'); return; }
     setLayersVisible(changes.map(c => ({ name: c.name, show: false })));
-    if (!undoing) {
-      layerHistory.push(changes);
-      if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
-      updateUndoUI();
-    }
+    if (!undoing) { layerHistory.push(changes); if (layerHistory.length > MAX_HISTORY) layerHistory.shift(); updateUndoUI(); }
     renderLayers();
     notificar(`${changes.length} capa(s) apagada(s)`);
   }
 }, true);
 
-/* ============================================================
-   PDF VECTORIAL
-============================================================ */
 async function getJsPDF() {
   if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
   return new Promise((resolve, reject) => {
@@ -2113,22 +1681,28 @@ async function getJsPDF() {
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
     s.onload = () => {
       if (window.jspdf && window.jspdf.jsPDF) resolve(window.jspdf.jsPDF);
-      else reject(new Error('jsPDF no cargó correctamente'));
+      else reject(new Error('jsPDF no cargó'));
     };
     s.onerror = () => reject(new Error('No se pudo descargar jsPDF'));
     document.head.appendChild(s);
   });
 }
 
-/* Parsear DXF y extraer líneas vectoriales */
+async function getSvg2Pdf() {
+  if (window.svg2pdf) return window.svg2pdf;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.1/dist/svg2pdf.umd.min.js';
+    s.onload = () => { if (window.svg2pdf) resolve(window.svg2pdf); else reject(new Error('svg2pdf no cargó')); };
+    s.onerror = () => reject(new Error('No se pudo descargar svg2pdf'));
+    document.head.appendChild(s);
+  });
+}
+
 function parseDxfLines(dxfText) {
   const lines = dxfText.split(/\r?\n/);
   const entities = [];
-  let i = 0;
-  let inEntities = false;
-  let currentEntity = null;
-
-  // Detectar sección ENTITIES
+  let i = 0, inEntities = false;
   for (i = 0; i < lines.length; i++) {
     const code = lines[i].trim();
     const value = lines[i + 1] ? lines[i + 1].trim() : '';
@@ -2138,20 +1712,14 @@ function parseDxfLines(dxfText) {
     }
   }
   if (!inEntities) return entities;
-
-  let currentCode = '';
-  let currentValue = '';
+  let currentEntity = null;
   for (; i < lines.length - 1; i += 2) {
-    const code = lines[i].trim();
-    const value = lines[i + 1].trim();
-
+    const code = lines[i].trim(), value = lines[i + 1].trim();
     if (code === '0') {
       if (currentEntity) entities.push(currentEntity);
       if (value === 'ENDSEC') { currentEntity = null; break; }
       currentEntity = { type: value, values: {} };
-    } else if (currentEntity) {
-      currentEntity.values[code] = value;
-    }
+    } else if (currentEntity) { currentEntity.values[code] = value; }
   }
   if (currentEntity) entities.push(currentEntity);
   return entities;
@@ -2160,45 +1728,24 @@ function parseDxfLines(dxfText) {
 function extractVectorLines(entities) {
   const lines = [];
   for (const ent of entities) {
-    const v = ent.values;
-    const type = ent.type;
+    const v = ent.values, type = ent.type;
     if (type === 'LINE') {
       const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
       const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
-      if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) {
-        lines.push({ x1, y1, x2, y2 });
-      }
+      if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) lines.push({ x1, y1, x2, y2 });
     } else if (type === 'LWPOLYLINE' || type === 'POLYLINE') {
-      // Extraer vértices (simplificado: solo los pares 10/20)
       const xs = [], ys = [];
-      for (let k = 10; k <= 19; k += 10) {
-        const x = parseFloat(v[String(k)]);
-        const y = parseFloat(v[String(k + 10)]);
-        if (isFinite(x) && isFinite(y)) { xs.push(x); ys.push(y); }
-      }
-      // También buscar códigos 10/20 sueltos
       for (const key in v) {
-        if (key === '10') {
-          const x = parseFloat(v[key]);
-          const y = parseFloat(v['20']);
-          if (isFinite(x) && isFinite(y)) { xs.push(x); ys.push(y); }
-        }
+        if (key === '10') { const x = parseFloat(v[key]); const y = parseFloat(v['20']); if (isFinite(x) && isFinite(y)) { xs.push(x); ys.push(y); } }
       }
-      for (let k = 0; k < xs.length - 1; k++) {
-        lines.push({ x1: xs[k], y1: ys[k], x2: xs[k + 1], y2: ys[k + 1] });
-      }
+      for (let k = 0; k < xs.length - 1; k++) lines.push({ x1: xs[k], y1: ys[k], x2: xs[k + 1], y2: ys[k + 1] });
     } else if (type === 'CIRCLE') {
       const cx = parseFloat(v['10']), cy = parseFloat(v['20']), r = parseFloat(v['40']);
       if (isFinite(cx) && isFinite(cy) && isFinite(r)) {
-        // Aproximar círculo con segmentos
-        const N = 36;
+        const N = 48;
         for (let k = 0; k < N; k++) {
-          const a1 = (k / N) * Math.PI * 2;
-          const a2 = ((k + 1) / N) * Math.PI * 2;
-          lines.push({
-            x1: cx + r * Math.cos(a1), y1: cy + r * Math.sin(a1),
-            x2: cx + r * Math.cos(a2), y2: cy + r * Math.sin(a2),
-          });
+          const a1 = (k / N) * Math.PI * 2, a2 = ((k + 1) / N) * Math.PI * 2;
+          lines.push({ x1: cx + r * Math.cos(a1), y1: cy + r * Math.sin(a1), x2: cx + r * Math.cos(a2), y2: cy + r * Math.sin(a2) });
         }
       }
     } else if (type === 'ARC') {
@@ -2206,14 +1753,10 @@ function extractVectorLines(entities) {
       const sa = parseFloat(v['50'] || '0'), ea = parseFloat(v['51'] || '360');
       if (isFinite(cx) && isFinite(cy) && isFinite(r)) {
         const start = sa * Math.PI / 180, end = ea * Math.PI / 180;
-        const N = 24;
+        const N = 32;
         for (let k = 0; k < N; k++) {
-          const a1 = start + (k / N) * (end - start);
-          const a2 = start + ((k + 1) / N) * (end - start);
-          lines.push({
-            x1: cx + r * Math.cos(a1), y1: cy + r * Math.sin(a1),
-            x2: cx + r * Math.cos(a2), y2: cy + r * Math.sin(a2),
-          });
+          const a1 = start + (k / N) * (end - start), a2 = start + ((k + 1) / N) * (end - start);
+          lines.push({ x1: cx + r * Math.cos(a1), y1: cy + r * Math.sin(a1), x2: cx + r * Math.cos(a2), y2: cy + r * Math.sin(a2) });
         }
       }
     }
@@ -2227,15 +1770,26 @@ function buildPdfName(prefix) {
   return `${base}_${prefix}_${stamp}.pdf`;
 }
 
+async function generatePdfFromDataURL(dataURL, width, height, filename) {
+  if (!dataURL) { notificar('No se pudo capturar la vista', 'error'); return; }
+  try {
+    const jsPDF = await getJsPDF();
+    const pdf = new jsPDF({ orientation: width >= height ? 'landscape' : 'portrait', unit: 'px', format: [width, height], hotfixes: ['px_scaling'] });
+    pdf.addImage(dataURL, 'PNG', 0, 0, width, height, undefined, 'FAST');
+    pdf.save(filename);
+    notificar('PDF generado');
+  } catch (e) { notificar('Error al generar PDF: ' + (e.message || e), 'error'); }
+}
+
 async function generatePdfVectorial(regionRect) {
   if (!rawDxfText) { notificar('No hay datos DXF cargados', 'error'); return; }
   try {
     const jsPDF = await getJsPDF();
+    const Svg2Pdf = await getSvg2Pdf();
     const entities = parseDxfLines(rawDxfText);
     let vectorLines = extractVectorLines(entities);
-    if (vectorLines.length === 0) { notificar('No se encontraron líneas vectoriales', 'warn'); return; }
+    if (vectorLines.length === 0) { notificar('No se encontraron líneas', 'warn'); return; }
 
-    // Calcular bounds
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const l of vectorLines) {
       minX = Math.min(minX, l.x1, l.x2); maxX = Math.max(maxX, l.x1, l.x2);
@@ -2243,7 +1797,6 @@ async function generatePdfVectorial(regionRect) {
     }
     if (!isFinite(minX)) { notificar('No se pudieron calcular límites', 'error'); return; }
 
-    // Filtrar por región si se especificó
     if (regionRect) {
       const { x1: rx1, y1: ry1, x2: rx2, y2: ry2 } = regionRect;
       vectorLines = vectorLines.filter(l => {
@@ -2254,147 +1807,104 @@ async function generatePdfVectorial(regionRect) {
       minX = rx1; maxX = rx2; minY = ry1; maxY = ry2;
     }
 
-    const w = maxX - minX;
-    const h = maxY - minY;
-    const margin = 10;
-    const scale = Math.min((595 - 2*margin) / w, (842 - 2*margin) / h); // A4 en puntos
+    const w = maxX - minX, h = maxY - minY;
+    const margin = 20;
+    const scale = Math.min((842 - 2*margin) / w, (595 - 2*margin) / h);
+    const svgW = w * scale + 2*margin, svgH = h * scale + 2*margin;
 
-    const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: w > h ? 'landscape' : 'portrait' });
-    pdf.setLineWidth(0.3);
-    pdf.setDrawColor(0, 0, 0);
-
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">`;
+    svg += `<rect width="${svgW}" height="${svgH}" fill="white"/>`;
     for (const l of vectorLines) {
       const x1 = margin + (l.x1 - minX) * scale;
-      const y1 = 842 - margin - (l.y1 - minY) * scale;
+      const y1 = svgH - margin - (l.y1 - minY) * scale;
       const x2 = margin + (l.x2 - minX) * scale;
-      const y2 = 842 - margin - (l.y2 - minY) * scale;
-      pdf.line(x1, y1, x2, y2);
+      const y2 = svgH - margin - (l.y2 - minY) * scale;
+      svg += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="black" stroke-width="0.5"/>`;
     }
+    svg += '</svg>';
 
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+    const svgElement = svgDoc.documentElement;
+
+    const pdf = new jsPDF({ orientation: svgW > svgH ? 'landscape' : 'portrait', unit: 'pt', format: [svgW, svgH] });
+    await Svg2Pdf(svgElement, pdf);
     pdf.save(buildPdfName(regionRect ? 'area' : 'vista'));
-    notificar('PDF vectorial generado');
+    notificar('PDF generado');
   } catch (e) {
     console.error(e);
-    notificar('Error al generar PDF vectorial: ' + (e.message || e), 'error');
+    notificar('Error al generar PDF: ' + (e.message || e), 'error');
   }
 }
 
-DOM.btnPdf.addEventListener('click', (e) => {
-  e.stopPropagation();
-  if (DOM.btnPdf.disabled) return;
-  DOM.pdfMenu.classList.toggle('activo');
-});
+DOM.btnPdf.addEventListener('click', (e) => { e.stopPropagation(); if (DOM.btnPdf.disabled) return; DOM.pdfMenu.classList.toggle('activo'); });
 document.addEventListener('click', (e) => {
   if (!DOM.pdfMenu.classList.contains('activo')) return;
   if (DOM.pdfMenu.contains(e.target) || DOM.btnPdf.contains(e.target)) return;
   DOM.pdfMenu.classList.remove('activo');
 });
-DOM.pdfOptVisible.addEventListener('click', () => {
-  DOM.pdfMenu.classList.remove('activo');
-  generatePdfVectorial(null);
-});
-DOM.pdfOptArea.addEventListener('click', () => {
-  DOM.pdfMenu.classList.remove('activo');
-  enterPdfAreaMode();
-});
+DOM.pdfOptVisible.addEventListener('click', () => { DOM.pdfMenu.classList.remove('activo'); generatePdfVectorial(null); });
+DOM.pdfOptArea.addEventListener('click', () => { DOM.pdfMenu.classList.remove('activo'); enterPdfAreaMode(); });
 
 function enterPdfAreaMode() {
-  if (clickHideMode) {
-    clickHideMode = false;
-    DOM.btnClickHide.classList.remove('active', 'active-danger');
-    DOM.canvasContainer.classList.remove('mode-clickhide');
-  }
+  if (clickHideMode) { clickHideMode = false; DOM.btnClickHide.classList.remove('active', 'active-danger'); DOM.canvasContainer.classList.remove('mode-clickhide'); }
   if (measureMode) exitMeasureMode();
   pdfAreaMode = true;
   DOM.canvasContainer.classList.add('mode-pdfarea');
   notificar('Arrastrá un rectángulo sobre el plano para exportar ese sector');
 }
-function exitPdfAreaMode() {
-  pdfAreaMode = false;
-  DOM.canvasContainer.classList.remove('mode-pdfarea');
-}
+function exitPdfAreaMode() { pdfAreaMode = false; DOM.canvasContainer.classList.remove('mode-pdfarea'); }
 
-/* ============================================================
-   CARGA DE ARCHIVO (DWG y DXF) — CON TIMEOUT DE SEGURIDAD
-============================================================ */
 async function processFile(file) {
   if (!file) return;
   const isDwg = /\.dwg$/i.test(file.name);
   const isDxf = /\.dxf$/i.test(file.name);
-  if (!isDwg && !isDxf) {
-    notificar('El archivo debe ser .dwg o .dxf', 'error');
-    return;
-  }
+  if (!isDwg && !isDxf) { notificar('El archivo debe ser .dwg o .dxf', 'error'); return; }
 
   DOM.emptyState.classList.add('hidden');
   DOM.loadingOverlay.classList.add('activo');
-  DOM.loadingLabel.textContent = 'Preparando motor de conversión…';
+  DOM.loadingLabel.textContent = 'Preparando motor…';
   DOM.loadingSub.textContent = 'La primera vez puede tardar unos segundos.';
-  DOM.btnOpen.disabled = true;
-  DOM.btnPdf.disabled = true;
-  DOM.btnZoomIn.disabled = true;
-  DOM.btnZoomOut.disabled = true;
-  DOM.btnFit.disabled = true;
-  DOM.btnRegen.disabled = true;
+  DOM.btnOpen.disabled = true; DOM.btnPdf.disabled = true;
+  DOM.btnZoomIn.disabled = true; DOM.btnZoomOut.disabled = true;
+  DOM.btnFit.disabled = true; DOM.btnRegen.disabled = true;
   DOM.btnClickHide.disabled = true;
   setStatus('Procesando ' + file.name);
 
-  // Timeout de seguridad: si en 60s no termina, ocultar overlay
   const safetyTimeout = setTimeout(() => {
     DOM.loadingOverlay.classList.remove('activo');
     DOM.btnOpen.disabled = false;
-    notificar('La carga está tardando demasiado. Verificá la consola.', 'warn');
-  }, 60000);
+    notificar('La carga está tardando demasiado.', 'warn');
+  }, 90000);
 
+  let fonts = [];
   try {
+    let dxfText;
     if (isDwg) {
-      if (!wasmReady) {
-        await init({ wasmBase: CDN_WASM_BASE });
-        wasmReady = true;
-      }
+      if (!wasmReady) { await init({ wasmBase: CDN_WASM_BASE }); wasmReady = true; }
       DOM.loadingLabel.textContent = 'Leyendo archivo DWG…';
       const buf = await file.arrayBuffer();
-      const dwgBytes = new Uint8Array(buf);
-
       DOM.loadingLabel.textContent = 'Convirtiendo DWG a DXF…';
-      DOM.loadingSub.textContent = 'Esto se ejecuta por completo en tu navegador.';
-      const dxfBytes = await convertDwgToDxf(dwgBytes);
-      const dxfText = new TextDecoder().decode(dxfBytes);
-      rawDxfText = dxfText;
-
-      DOM.loadingLabel.textContent = 'Cargando tipografías…';
-      const fonts = await getFonts();
-
-      DOM.loadingLabel.textContent = 'Renderizando dibujo…';
-      DOM.loadingSub.textContent = 'Optimizando geometría para WebGL.';
-      initViewer();
-
-      const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
-      const dxfUrl = URL.createObjectURL(dxfBlob);
-      const loadOpts = { url: dxfUrl };
-      if (fonts.length > 0) loadOpts.fonts = fonts;
-      await viewer.Load(loadOpts);
-      URL.revokeObjectURL(dxfUrl);
-
+      const dxfBytes = await convertDwgToDxf(new Uint8Array(buf));
+      dxfText = new TextDecoder().decode(dxfBytes);
     } else {
       DOM.loadingLabel.textContent = 'Leyendo archivo DXF…';
-      DOM.loadingSub.textContent = 'Renderizando dibujo…';
-      const text = await file.text();
-      rawDxfText = text;
-
-      DOM.loadingLabel.textContent = 'Cargando tipografías…';
-      const fonts = await getFonts();
-
-      DOM.loadingLabel.textContent = 'Renderizando dibujo…';
-      initViewer();
-
-      const dxfBlob = new Blob([text], { type: 'text/plain' });
-      const dxfUrl = URL.createObjectURL(dxfBlob);
-      const loadOpts = { url: dxfUrl };
-      if (fonts.length > 0) loadOpts.fonts = fonts;
-      await viewer.Load(loadOpts);
-      URL.revokeObjectURL(dxfUrl);
+      dxfText = await file.text();
     }
+    rawDxfText = dxfText;
+
+    DOM.loadingLabel.textContent = 'Cargando tipografías…';
+    fonts = await getFonts();
+
+    DOM.loadingLabel.textContent = 'Renderizando dibujo…';
+    initViewer();
+
+    const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
+    const dxfUrl = URL.createObjectURL(dxfBlob);
+    const loadOpts = { url: dxfUrl };
+    if (fonts.length > 0) loadOpts.fonts = fonts;
+    await viewer.Load(loadOpts);
+    URL.revokeObjectURL(dxfUrl);
 
     clearTimeout(safetyTimeout);
     setTimeout(configureMouseControls, 200);
@@ -2402,19 +1912,12 @@ async function processFile(file) {
     layersState.clear();
     layerHistory.length = 0;
     updateUndoUI();
-    try {
-      for (const L of viewer.GetLayers()) {
-        if (!L || typeof L.name !== 'string') continue;
-        layersState.set(L.name, { color: L.color, visible: true });
-      }
-    } catch (e) { console.warn('No se pudieron leer capas:', e); }
+    try { for (const L of viewer.GetLayers()) { if (!L || typeof L.name !== 'string') continue; layersState.set(L.name, { color: L.color, visible: true }); } } catch (e) {}
     syncLayersStateFromScene();
     renderLayers();
 
-    stats.fileSize = file.size;
-    stats.fileName = file.name;
-    DOM.fileName.textContent = file.name;
-    DOM.fileName.title = file.name;
+    stats.fileSize = file.size; stats.fileName = file.name;
+    DOM.fileName.textContent = file.name; DOM.fileName.title = file.name;
     DOM.fileSize.textContent = fmtBytes(file.size);
     const entMatch = rawDxfText.match(/\n\s*0\s*\n/g);
     stats.entityCount = entMatch ? entMatch.length : 0;
@@ -2423,22 +1926,17 @@ async function processFile(file) {
 
     const bounds = viewer.GetBounds();
     if (bounds) {
-      const w = bounds.maxX - bounds.minX;
-      const h = bounds.maxY - bounds.minY;
+      const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
       DOM.extentsRow.style.display = '';
       DOM.extentsVal.textContent = `${fmtNum(w)} × ${fmtNum(h)} m`;
     }
 
-    DOM.btnPdf.disabled = false;
-    DOM.btnZoomIn.disabled = false;
-    DOM.btnZoomOut.disabled = false;
-    DOM.btnFit.disabled = false;
+    DOM.btnPdf.disabled = false; DOM.btnZoomIn.disabled = false;
+    DOM.btnZoomOut.disabled = false; DOM.btnFit.disabled = false;
     DOM.btnRegen.disabled = false;
     setStatus(`Listo · ${stats.entityCount.toLocaleString('es')} entidades · ${layersState.size} capas`);
     notificar('Dibujo cargado correctamente');
-    if (fonts.length === 0) {
-      notificar('No se pudieron cargar tipografías: los textos no se mostrarán', 'warn');
-    }
+    if (fonts.length === 0) notificar('No se pudieron cargar tipografías: los textos no se mostrarán', 'warn');
   } catch (err) {
     console.error(err);
     notificar('Error al procesar el archivo: ' + (err.message || err), 'error');
@@ -2451,106 +1949,36 @@ async function processFile(file) {
   }
 }
 
-/* ============================================================
-   ABRIR / DRAG & DROP
-============================================================ */
 function openFileDialog() { DOM.fileInput.click(); }
 DOM.btnOpen.addEventListener('click', openFileDialog);
 DOM.btnOpenEmpty.addEventListener('click', openFileDialog);
-DOM.fileInput.addEventListener('change', (e) => {
-  const f = e.target.files && e.target.files[0];
-  if (f) processFile(f);
-  e.target.value = '';
-});
+DOM.fileInput.addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) processFile(f); e.target.value = ''; });
 
 let dragCounter = 0;
-['dragenter', 'dragover'].forEach(ev => {
-  window.addEventListener(ev, (e) => {
-    e.preventDefault();
-    if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
-      dragCounter++;
-      DOM.dragOverlay.classList.add('activo');
-    }
-  });
-});
-['dragleave', 'drop'].forEach(ev => {
-  window.addEventListener(ev, (e) => {
-    e.preventDefault();
-    if (ev === 'dragleave') {
-      dragCounter = Math.max(0, dragCounter - 1);
-      if (dragCounter === 0) DOM.dragOverlay.classList.remove('activo');
-    } else {
-      dragCounter = 0;
-      DOM.dragOverlay.classList.remove('activo');
-    }
-  });
-});
-window.addEventListener('drop', (e) => {
-  e.preventDefault();
-  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-  if (f) processFile(f);
-});
+['dragenter', 'dragover'].forEach(ev => { window.addEventListener(ev, (e) => { e.preventDefault(); if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) { dragCounter++; DOM.dragOverlay.classList.add('activo'); } }); });
+['dragleave', 'drop'].forEach(ev => { window.addEventListener(ev, (e) => { e.preventDefault(); if (ev === 'dragleave') { dragCounter = Math.max(0, dragCounter - 1); if (dragCounter === 0) DOM.dragOverlay.classList.remove('activo'); } else { dragCounter = 0; DOM.dragOverlay.classList.remove('activo'); } }); });
+window.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) processFile(f); });
 
-/* ============================================================
-   PANEL LATERAL
-============================================================ */
-DOM.btnSidebarToggle.addEventListener('click', () => {
-  DOM.sidePanel.classList.toggle('colapsado');
-  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 240);
-});
+DOM.btnSidebarToggle.addEventListener('click', () => { DOM.sidePanel.classList.toggle('colapsado'); setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 240); });
 if (window.innerWidth <= 900) DOM.sidePanel.classList.add('colapsado');
 
-/* ============================================================
-   INFO CARD
-============================================================ */
-DOM.infoFab.addEventListener('click', (e) => {
-  e.stopPropagation();
-  DOM.infoCard.classList.toggle('activo');
-});
-document.addEventListener('click', (e) => {
-  if (!DOM.infoCard.classList.contains('activo')) return;
-  if (DOM.infoCard.contains(e.target) || DOM.infoFab.contains(e.target)) return;
-  DOM.infoCard.classList.remove('activo');
-});
+DOM.infoFab.addEventListener('click', (e) => { e.stopPropagation(); DOM.infoCard.classList.toggle('activo'); });
+document.addEventListener('click', (e) => { if (!DOM.infoCard.classList.contains('activo')) return; if (DOM.infoCard.contains(e.target) || DOM.infoFab.contains(e.target)) return; DOM.infoCard.classList.remove('activo'); });
 
-/* ============================================================
-   TECLADO
-============================================================ */
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
-
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-    e.preventDefault();
-    if (undoLayerChange()) notificar('Cambio de capa deshecho');
-    else notificar('Nada para deshacer', 'warn');
-    return;
-  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); if (undoLayerChange()) notificar('Cambio de capa deshecho'); else notificar('Nada para deshacer', 'warn'); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); openFileDialog(); return; }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
-    e.preventDefault();
-    if (!DOM.btnPdf.disabled) { DOM.pdfMenu.classList.remove('activo'); generatePdfVectorial(null); }
-    return;
-  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); if (!DOM.btnPdf.disabled) { DOM.pdfMenu.classList.remove('activo'); generatePdfVectorial(null); } return; }
   if (e.ctrlKey || e.metaKey) return;
-
   if (e.key === 'Escape') {
-    DOM.infoCard.classList.remove('activo');
-    DOM.pdfMenu.classList.remove('activo');
-    if (clickHideMode) {
-      clickHideMode = false;
-      DOM.btnClickHide.classList.remove('active', 'active-danger');
-      DOM.canvasContainer.classList.remove('mode-clickhide');
-    }
+    DOM.infoCard.classList.remove('activo'); DOM.pdfMenu.classList.remove('activo');
+    if (clickHideMode) { clickHideMode = false; DOM.btnClickHide.classList.remove('active', 'active-danger'); DOM.canvasContainer.classList.remove('mode-clickhide'); }
     if (pdfAreaMode) exitPdfAreaMode();
     if (measureMode) {
-      // Terminar medición si hay puntos, si no salir
-      if (measurePoints.length > 0 && (measureTool === 'polyline' || measureTool === 'area')) {
-        updateMeasureResult();
-        drawMeasurePreview();
-      } else {
-        exitMeasureMode();
-      }
+      if (measurePoints.length > 0 && (measureTool === 'polyline' || measureTool === 'area')) { updateMeasureResult(); drawMeasurePreview(); }
+      else { exitMeasureMode(); }
     }
   }
   if (e.key.toLowerCase() === 'g') { gridVisible = !gridVisible; applyGrid(); }
@@ -2562,10 +1990,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '-' || e.key === '_') { if (!DOM.btnZoomOut.disabled) zoomOut(); }
 });
 
-/* Redibujar overlay al redimensionar */
-window.addEventListener('resize', () => {
-  setTimeout(() => drawMeasurePreview(), 50);
-});
+window.addEventListener('resize', () => { setTimeout(() => drawMeasurePreview(), 50); });
 
 updateUndoUI();
 </script>
