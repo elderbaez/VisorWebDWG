@@ -508,6 +508,42 @@ body {
   color: #111 !important; font-weight: 700;
 }
 
+/* Botón flotante "Terminar medición" */
+.measure-finish-btn {
+  position: absolute;
+  bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.15rem;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 24px;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  z-index: 400;
+  box-shadow: 0 6px 20px rgba(63, 185, 80, 0.4), 0 0 0 1px rgba(255,255,255,0.1);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s;
+  opacity: 0;
+}
+.measure-finish-btn.activo {
+  display: inline-flex;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.measure-finish-btn:active {
+  transform: translateX(-50%) translateY(0) scale(0.95);
+}
+.measure-finish-btn svg {
+  width: 16px; height: 16px;
+}
+
 @media (max-width: 900px) {
   .btn-sidebar-toggle { display: inline-flex; }
   .side-panel {
@@ -539,6 +575,9 @@ body {
   .cad-tool-btn span:not(.badge) { display: none; }
   .cad-tool-btn { padding: 4px 6px; }
   .measure-panel { min-width: auto; width: calc(100vw - 1rem); left: 0.5rem; transform: none; }
+  .measure-finish-btn {
+    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 </style>
 </head>
@@ -641,8 +680,15 @@ body {
         </div>
 
         <div class="trackpad-hint" id="trackpadHint">
-          <b>1 dedo</b> mueve el cursor · <b>Tap</b> = clic · <b>2 dedos</b> pan/zoom
+          <b>1 dedo</b> mueve cursor · <b>Tap</b> clic · <b>Arrastrar</b> cuadro · <b>2 dedos</b> pan/zoom
         </div>
+
+        <button class="measure-finish-btn" id="btnMeasureFinish" title="Terminar (doble tap / Enter)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          <span>Terminar</span>
+        </button>
 
         <div class="measure-panel" id="measurePanel">
           <div class="measure-header">
@@ -844,6 +890,7 @@ const DOM = {
   measureResult: document.getElementById('measureResult'),
   measureHistory: document.getElementById('measureHistory'),
   btnMeasureClearHistory: document.getElementById('btnMeasureClearHistory'),
+  btnMeasureFinish: document.getElementById('btnMeasureFinish'),
   snapMarker: document.getElementById('snapMarker'),
   snapMarkerLabel: document.getElementById('snapMarkerLabel'),
   measureOverlay: document.getElementById('measure-overlay'),
@@ -1224,6 +1271,37 @@ function zoomAtScreenPoint(factor, clientX, clientY) {
   requestAnimationFrame(() => drawMeasurePreview());
 }
 
+function panByScreenDelta(dxPx, dyPx) {
+  if (!viewer) return;
+  const camera = viewer.GetCamera();
+  const controls = viewer.controls;
+  if (!camera || !controls) return;
+
+  const canvas = viewer.GetCanvas();
+  const rect = canvas.getBoundingClientRect();
+  const halfW = rect.width / 2;
+  const halfH = rect.height / 2;
+
+  const worldCenter = new THREE.Vector3(0, 0, 1).unproject(camera);
+  const worldX = new THREE.Vector3(1, 0, 1).unproject(camera);
+  const worldY = new THREE.Vector3(0, 1, 1).unproject(camera);
+
+  const worldPerPxX = (worldX.x - worldCenter.x) / halfW;
+  const worldPerPxY = (worldY.y - worldCenter.y) / halfH;
+
+  const dxWorld = -dxPx * worldPerPxX;
+  const dyWorld = -dyPx * worldPerPxY;
+
+  camera.position.x += dxWorld;
+  camera.position.y += dyWorld;
+  controls.target.x += dxWorld;
+  controls.target.y += dyWorld;
+  camera.updateMatrixWorld();
+  controls.update();
+  viewer.Render();
+  requestAnimationFrame(() => drawMeasurePreview());
+}
+
 function zoomIn() {
   const rect = DOM.viewerContainer.getBoundingClientRect();
   zoomAtScreenPoint(1.25, rect.left + rect.width / 2, rect.top + rect.height / 2);
@@ -1363,6 +1441,48 @@ function pickLayerAtPoint(clientX, clientY, threshold = 14) {
   return bestLayer;
 }
 
+function pickLayersInBox(x1, y1, x2, y2) {
+  if (!viewer) return [];
+  const scene = viewer.GetScene();
+  const camera = viewer.GetCamera();
+  const canvas = viewer.GetCanvas();
+  if (!scene || !camera || !canvas) return [];
+  try { scene.updateMatrixWorld(true); } catch (e) {}
+  const rect = canvas.getBoundingClientRect();
+  const bx1 = Math.min(x1, x2) - rect.left, bx2 = Math.max(x1, x2) - rect.left;
+  const by1 = Math.min(y1, y2) - rect.top,  by2 = Math.max(y1, y2) - rect.top;
+  const layers = new Set();
+  const halfW = rect.width * 0.5, halfH = rect.height * 0.5;
+  const v = new THREE.Vector3();
+  const MAX_SAMPLES = 8000;
+  const visit = (obj) => {
+    if (!obj) return;
+    let anc = obj, visible = true;
+    while (anc && anc !== scene) { if (anc.visible === false) { visible = false; break; } anc = anc.parent; }
+    if (!visible) return;
+    const geom = obj.geometry;
+    const pos = geom && geom.attributes && geom.attributes.position;
+    if (pos && pos.count > 0) {
+      const m = obj.matrixWorld;
+      const count = pos.count;
+      const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
+      for (let i = 0; i < count; i += vStep) {
+        v.fromBufferAttribute(pos, i); v.applyMatrix4(m); v.project(camera);
+        if (v.z > 1) continue;
+        const sx = (v.x + 1) * halfW, sy = (-v.y + 1) * halfH;
+        if (sx >= bx1 && sx <= bx2 && sy >= by1 && sy <= by2) {
+          const lname = getLayerNameFromObject(obj);
+          if (lname) layers.add(lname);
+          break;
+        }
+      }
+    }
+    if (obj.children) for (const c of obj.children) visit(c);
+  };
+  for (const c of scene.children) visit(c);
+  return [...layers];
+}
+
 function projectWorldToScreen(x, y, camera, canvasRect) {
   const origin = viewer.GetOrigin();
   const v = new THREE.Vector3(x - origin.x, y - origin.y, 0);
@@ -1388,11 +1508,11 @@ function projectScreenToWorld(clientX, clientY) {
 function cleanMText(s) {
   if (!s) return '';
   return s
-    .replace(/\\P/gi, ' ')              // salto de párrafo
-    .replace(/\\~/g, ' ')               // espacio duro
-    .replace(/\\[A-Za-z][^;]*;/g, '')   // \fArial; \H2.5x; \C1; etc.
-    .replace(/[{}]/g, '')               // llaves de agrupación
-    .replace(/\\\\/g, '\\')             // backslash escapado
+    .replace(/\\P/gi, ' ')
+    .replace(/\\~/g, ' ')
+    .replace(/\\[A-Za-z][^;]*;/g, '')
+    .replace(/[{}]/g, '')
+    .replace(/\\\\/g, '\\')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1555,7 +1675,6 @@ function buildMeasureGeometry(dxfText) {
       continue;
     }
     if (cur) {
-      // Recolectar fragmentos de texto (TEXT: sólo código 1; MTEXT: códigos 1 y 3)
       if (code === '1' || code === '3') {
         if (!cur.textChunks) cur.textChunks = [];
         cur.textChunks.push(value);
@@ -1599,7 +1718,6 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
   const clickY = clientY - rect.top;
   const thresh2 = threshold * threshold;
 
-  // 1) Snaps geométricos exactos
   let best = null, bestDist2 = thresh2;
   for (const pt of snapPoints) {
     let tipoActivo = false;
@@ -1620,22 +1738,18 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
   }
   if (best) return best;
 
-  // 2) Perpendicular
   if (measureSnaps.has('perpendicular')) {
     const pp = findPerpendicularSnap(clientX, clientY, threshold);
     if (pp) return pp;
   }
-  // 3) Intersección
   if (measureSnaps.has('intersection')) {
     const ix = findIntersectionNear(clientX, clientY, threshold);
     if (ix) return ix;
   }
-  // 4) Intersección ficticia (extensión)
   if (measureSnaps.has('fictitious')) {
     const fx = findFictitiousIntersection(clientX, clientY, threshold);
     if (fx) return fx;
   }
-  // 5) Cercano (sobre segmento)
   if (measureSnaps.has('nearest')) {
     const nr = findNearestOnSegments(clientX, clientY, threshold);
     if (nr) return nr;
@@ -1793,7 +1907,6 @@ function drawMeasurePreview() {
 
   const proj = (wp) => projectWorldToScreen(wp.x, wp.y, camera, rect);
 
-  // 1. Historial de mediciones confirmadas
   measureHistory.forEach(item => {
     ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(63, 185, 80, 0.85)';
@@ -1827,7 +1940,6 @@ function drawMeasurePreview() {
 
   if (!measureMode || measurePoints.length === 0) return;
 
-  // 2. Medición activa
   const pts = measurePoints;
   let curX, curY;
   if (lastSnapPoint) { curX = lastSnapPoint.screenX; curY = lastSnapPoint.screenY; }
@@ -1913,6 +2025,14 @@ DOM.btnMeasureClearHistory.addEventListener('click', () => {
   drawMeasurePreview();
 });
 
+function updateFinishButton() {
+  if (!DOM.btnMeasureFinish) return;
+  const needsFinish = measureMode &&
+    (measureTool === 'polyline' || measureTool === 'area') &&
+    measurePoints.length >= 2;
+  DOM.btnMeasureFinish.classList.toggle('activo', needsFinish);
+}
+
 function enterMeasureMode() {
   if (clickHideMode) { clickHideMode = false; DOM.btnClickHide.classList.remove('active', 'active-danger'); DOM.canvasContainer.classList.remove('mode-clickhide'); }
   if (pdfAreaMode) exitPdfAreaMode();
@@ -1932,11 +2052,13 @@ function exitMeasureMode() {
   clearMeasure();
   DOM.snapMarker.classList.add('oculto');
   DOM.measureResult.innerHTML = '<span class="mr-hint">Elegí una herramienta y hacé clic sobre el dibujo.</span>';
+  if (DOM.btnMeasureFinish) DOM.btnMeasureFinish.classList.remove('activo');
   drawMeasurePreview();
 }
 function clearMeasure() {
   measurePoints = []; lastSnapPoint = null;
   DOM.snapMarker.classList.add('oculto');
+  updateFinishButton();
   drawMeasurePreview();
 }
 
@@ -1950,6 +2072,7 @@ document.querySelectorAll('.measure-tool-btn').forEach(btn => {
     measureTool = btn.dataset.tool;
     clearMeasure();
     updateMeasureHint();
+    updateFinishButton();
   });
 });
 document.querySelectorAll('.snap-btn').forEach(btn => {
@@ -2002,7 +2125,33 @@ function finishCurrentMeasurement() {
   measurePoints = [];
   lastSnapPoint = null;
   DOM.snapMarker.classList.add('oculto');
+  updateFinishButton();
   drawMeasurePreview();
+}
+
+function terminarMedicionActual() {
+  if (!measureMode) return;
+  if ((measureTool === 'polyline' && measurePoints.length >= 2) ||
+      (measureTool === 'area' && measurePoints.length >= 3)) {
+    if (measurePoints.length > 2) {
+      const p1 = measurePoints[measurePoints.length - 1];
+      const p2 = measurePoints[measurePoints.length - 2];
+      if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1e-9) {
+        measurePoints.pop();
+      }
+    }
+    updateMeasureResult();
+    finishCurrentMeasurement();
+  } else {
+    notificar('Agregá al menos ' + (measureTool === 'area' ? '3' : '2') + ' puntos', 'warn');
+  }
+}
+
+if (DOM.btnMeasureFinish) {
+  DOM.btnMeasureFinish.addEventListener('click', (e) => {
+    e.stopPropagation();
+    terminarMedicionActual();
+  });
 }
 
 DOM.viewerContainer.addEventListener('click', (e) => {
@@ -2024,6 +2173,7 @@ DOM.viewerContainer.addEventListener('click', (e) => {
   } else if (measureTool === 'angle' && measurePoints.length === 3) {
     finishCurrentMeasurement();
   } else {
+    updateFinishButton();
     drawMeasurePreview();
   }
 }, true);
@@ -2032,15 +2182,7 @@ DOM.viewerContainer.addEventListener('dblclick', (e) => {
   if (!measureMode) return;
   if (measureTool === 'polyline' || measureTool === 'area') {
     e.stopPropagation(); e.preventDefault();
-    if (measurePoints.length > 2) {
-       const p1 = measurePoints[measurePoints.length - 1];
-       const p2 = measurePoints[measurePoints.length - 2];
-       if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1e-9) {
-           measurePoints.pop();
-       }
-    }
-    updateMeasureResult();
-    finishCurrentMeasurement();
+    terminarMedicionActual();
   }
 });
 
@@ -2203,48 +2345,6 @@ document.addEventListener('pointerup', (e) => {
     notificar(`${changes.length} capa(s) apagada(s)`);
   }
 }, true);
-
-function pickLayersInBox(x1, y1, x2, y2) {
-  if (!viewer) return [];
-  const scene = viewer.GetScene();
-  const camera = viewer.GetCamera();
-  const canvas = viewer.GetCanvas();
-  if (!scene || !camera || !canvas) return [];
-  try { scene.updateMatrixWorld(true); } catch (e) {}
-  const rect = canvas.getBoundingClientRect();
-  const bx1 = Math.min(x1, x2) - rect.left, bx2 = Math.max(x1, x2) - rect.left;
-  const by1 = Math.min(y1, y2) - rect.top,  by2 = Math.max(y1, y2) - rect.top;
-  const layers = new Set();
-  const halfW = rect.width * 0.5, halfH = rect.height * 0.5;
-  const v = new THREE.Vector3();
-  const MAX_SAMPLES = 8000;
-  const visit = (obj) => {
-    if (!obj) return;
-    let anc = obj, visible = true;
-    while (anc && anc !== scene) { if (anc.visible === false) { visible = false; break; } anc = anc.parent; }
-    if (!visible) return;
-    const geom = obj.geometry;
-    const pos = geom && geom.attributes && geom.attributes.position;
-    if (pos && pos.count > 0) {
-      const m = obj.matrixWorld;
-      const count = pos.count;
-      const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
-      for (let i = 0; i < count; i += vStep) {
-        v.fromBufferAttribute(pos, i); v.applyMatrix4(m); v.project(camera);
-        if (v.z > 1) continue;
-        const sx = (v.x + 1) * halfW, sy = (-v.y + 1) * halfH;
-        if (sx >= bx1 && sx <= bx2 && sy >= by1 && sy <= by2) {
-          const lname = getLayerNameFromObject(obj);
-          if (lname) layers.add(lname);
-          break;
-        }
-      }
-    }
-    if (obj.children) for (const c of obj.children) visit(c);
-  };
-  for (const c of scene.children) visit(c);
-  return [...layers];
-}
 
 /* ============================================================
    PDF — jsPDF + svg2pdf (2.x) unificados
@@ -2551,6 +2651,13 @@ window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); openFileDialog(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); if (!DOM.btnPdf.disabled) { DOM.pdfMenu.classList.remove('activo'); generatePdfVectorial(null); } return; }
   if (e.ctrlKey || e.metaKey) return;
+  if (e.key === 'Enter') {
+    if (measureMode && (measureTool === 'polyline' || measureTool === 'area')) {
+      e.preventDefault();
+      terminarMedicionActual();
+    }
+    return;
+  }
   if (e.key === 'Escape') {
     DOM.infoCard.classList.remove('activo'); DOM.pdfMenu.classList.remove('activo');
     if (clickHideMode) { clickHideMode = false; DOM.btnClickHide.classList.remove('active', 'active-danger'); DOM.canvasContainer.classList.remove('mode-clickhide'); }
@@ -2574,7 +2681,7 @@ window.addEventListener('resize', () => { setTimeout(() => drawMeasurePreview(),
 updateUndoUI();
 
 /* ============================================================
-   MODO TRACKPAD TÁCTIL (adaptado a Three.js / DxfViewer)
+   MODO TRACKPAD TÁCTIL
 ============================================================ */
 const esTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
@@ -2584,6 +2691,14 @@ let touchFingers = new Map();
 let touchTwoFinger = null;
 let touchActiveId = null;
 let trackpadHintTimeout = null;
+let lastTapTime = 0;
+let lastTapX = 0;
+let lastTapY = 0;
+
+// Variables para el arrastre (rectángulo de selección)
+let touchDragMode = false;
+let touchDragStart = null;
+let touchDragRect = null;
 
 const DOM_T = {
   cursor: document.getElementById('trackpadCursor'),
@@ -2605,7 +2720,6 @@ function posicionarCursorTrackpad() {
   trackpadCursorPx.y = Math.max(2, Math.min(rect.height - 2, trackpadCursorPx.y));
   DOM_T.cursor.style.left = (rect.left + trackpadCursorPx.x) + 'px';
   DOM_T.cursor.style.top  = (rect.top  + trackpadCursorPx.y) + 'px';
-  // Emular mousemove sobre el canvas para que el snap de medición se actualice
   const clientX = rect.left + trackpadCursorPx.x;
   const clientY = rect.top  + trackpadCursorPx.y;
   mouseScreen = { x: clientX, y: clientY };
@@ -2637,7 +2751,7 @@ function activarTrackpad(silencioso = false) {
   posicionarCursorTrackpad();
   if (DOM_T.btn) DOM_T.btn.classList.add('active-trackpad');
   if (!silencioso) {
-    notificar('Modo Trackpad ON · 1 dedo cursor · Tap clic · 2 dedos pan/zoom');
+    notificar('Modo Trackpad ON · 1 dedo cursor · Tap clic · Arrastrar cuadro · 2 dedos pan/zoom');
     mostrarHintTrackpad(4500);
   }
 }
@@ -2646,6 +2760,7 @@ function desactivarTrackpad(silencioso = false) {
   if (!trackpadActivo) return;
   trackpadActivo = false;
   DOM.canvasContainer.classList.remove('modo-trackpad');
+  cancelarDragTrackpad();
   touchFingers.clear();
   touchTwoFinger = null;
   touchActiveId = null;
@@ -2679,6 +2794,89 @@ function dispararClickEnCursor() {
   target.dispatchEvent(ev);
 }
 
+/* ============================================================
+   ARRASTRE CON TRACKPAD (rectángulo de selección)
+============================================================ */
+function iniciarRectTrackpad(x1, y1) {
+  cancelarDragTrackpad();
+  touchDragRect = document.createElement('div');
+  touchDragRect.className = 'selection-rect' + (pdfAreaMode ? ' pdf' : '');
+  touchDragRect.style.left = x1 + 'px';
+  touchDragRect.style.top = y1 + 'px';
+  touchDragRect.style.width = '0px';
+  touchDragRect.style.height = '0px';
+  document.body.appendChild(touchDragRect);
+  if (navigator.vibrate) { try { navigator.vibrate(15); } catch(e){} }
+}
+
+function actualizarRectTrackpad(x1, y1, x2, y2) {
+  if (!touchDragRect) return;
+  const left = Math.min(x1, x2);
+  const top = Math.min(y1, y2);
+  const w = Math.abs(x2 - x1);
+  const h = Math.abs(y2 - y1);
+  touchDragRect.style.left = left + 'px';
+  touchDragRect.style.top = top + 'px';
+  touchDragRect.style.width = w + 'px';
+  touchDragRect.style.height = h + 'px';
+}
+
+function cancelarDragTrackpad() {
+  if (touchDragRect) {
+    touchDragRect.remove();
+    touchDragRect = null;
+  }
+  touchDragMode = false;
+  touchDragStart = null;
+}
+
+function finalizarDragTrackpad(x1, y1, x2, y2) {
+  if (touchDragRect) { touchDragRect.remove(); touchDragRect = null; }
+  const dx = Math.abs(x2 - x1);
+  const dy = Math.abs(y2 - y1);
+  if (dx < 12 && dy < 12) return;
+
+  const bx1 = Math.min(x1, x2);
+  const by1 = Math.min(y1, y2);
+  const bx2 = Math.max(x1, x2);
+  const by2 = Math.max(y1, y2);
+
+  if (pdfAreaMode) {
+    exitPdfAreaMode();
+    generatePdfFromRegion(bx1, by1, bx2 - bx1, by2 - by1);
+    return;
+  }
+
+  if (clickHideMode) {
+    syncLayersStateFromScene();
+    const layersInBox = pickLayersInBox(bx1, by1, bx2, by2);
+    if (layersInBox.length === 0) {
+      notificar('Ningún objeto dentro del cuadro', 'warn');
+      return;
+    }
+    const changes = [];
+    for (const lname of layersInBox) {
+      const info = layersState.get(lname);
+      if (!info || !info.visible) continue;
+      changes.push({ name: lname, oldVisible: true, newVisible: false });
+      info.visible = false;
+    }
+    if (changes.length === 0) {
+      notificar('Las capas del cuadro ya estaban ocultas', 'warn');
+      return;
+    }
+    setLayersVisible(changes.map(c => ({ name: c.name, show: false })));
+    if (!undoing) {
+      layerHistory.push(changes);
+      if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
+      updateUndoUI();
+    }
+    renderLayers();
+    notificar(`${changes.length} capa(s) apagada(s)`);
+    if (navigator.vibrate) { try { navigator.vibrate([10, 30, 10]); } catch(e){} }
+  }
+}
+
 function handleTouchStart(e) {
   if (!esTargetDeTrackpad(e.target)) return;
   e.preventDefault(); e.stopPropagation();
@@ -2695,7 +2893,10 @@ function handleTouchStart(e) {
   if (touchFingers.size === 1) {
     touchActiveId = Array.from(touchFingers.keys())[0];
     touchTwoFinger = null;
+    touchDragMode = false;
+    touchDragStart = null;
   } else if (touchFingers.size >= 2) {
+    cancelarDragTrackpad();
     const ids = Array.from(touchFingers.keys()).slice(0, 2);
     const f1 = touchFingers.get(ids[0]);
     const f2 = touchFingers.get(ids[1]);
@@ -2703,6 +2904,8 @@ function handleTouchStart(e) {
       startDist: Math.max(1, Math.hypot(f2.startX - f1.startX, f2.startY - f1.startY)),
       startCenterX: (f1.startX + f2.startX) / 2,
       startCenterY: (f1.startY + f2.startY) / 2,
+      lastCenterX: (f1.startX + f2.startX) / 2,
+      lastCenterY: (f1.startY + f2.startY) / 2,
       ids
     };
   }
@@ -2720,39 +2923,74 @@ function handleTouchMove(e) {
     if (!f) continue;
     const dx = t.clientX - f.lastX;
     const dy = t.clientY - f.lastY;
-    if (Math.hypot(t.clientX - f.startX, t.clientY - f.startY) > 8) f.moved = true;
+    const distFromStart = Math.hypot(t.clientX - f.startX, t.clientY - f.startY);
+    if (distFromStart > 8) f.moved = true;
 
     if (touchFingers.size === 1 && t.identifier === touchActiveId) {
-      trackpadCursorPx.x += dx;
-      trackpadCursorPx.y += dy;
+      const puedeArrastrar = (clickHideMode || pdfAreaMode);
+      if (puedeArrastrar && !touchDragMode && distFromStart > 12) {
+        touchDragMode = true;
+        touchDragStart = { clientX: f.startX, clientY: f.startY };
+        iniciarRectTrackpad(f.startX, f.startY);
+        mostrarHintTrackpad(1500);
+      }
+
+      if (touchDragMode && touchDragStart) {
+        actualizarRectTrackpad(f.startX, f.startY, t.clientX, t.clientY);
+      } else {
+        trackpadCursorPx.x += dx;
+        trackpadCursorPx.y += dy;
+      }
     }
     f.lastX = t.clientX; f.lastY = t.clientY;
   }
 
-  // Pinza con 2 dedos → zoom
   if (touchFingers.size >= 2 && touchTwoFinger) {
     const ids = touchTwoFinger.ids;
     const f1 = touchFingers.get(ids[0]);
     const f2 = touchFingers.get(ids[1]);
     if (!f1 || !f2) return;
+
     const curDist = Math.max(1, Math.hypot(f2.lastX - f1.lastX, f2.lastY - f1.lastY));
-    const ratio = curDist / touchTwoFinger.startDist;
     const curCenterX = (f1.lastX + f2.lastX) / 2;
     const curCenterY = (f1.lastY + f2.lastY) / 2;
+
+    const ratio = curDist / touchTwoFinger.startDist;
     if (Math.abs(ratio - 1) > 0.01) {
       zoomAtScreenPoint(ratio, curCenterX, curCenterY);
       touchTwoFinger.startDist = curDist;
     }
+
+    const dCenterX = curCenterX - touchTwoFinger.lastCenterX;
+    const dCenterY = curCenterY - touchTwoFinger.lastCenterY;
+    if (Math.abs(dCenterX) > 0.5 || Math.abs(dCenterY) > 0.5) {
+      panByScreenDelta(dCenterX, dCenterY);
+      touchTwoFinger.lastCenterX = curCenterX;
+      touchTwoFinger.lastCenterY = curCenterY;
+    }
     return;
   }
 
-  if (touchFingers.size === 1) posicionarCursorTrackpad();
+  if (touchFingers.size === 1 && !touchDragMode) posicionarCursorTrackpad();
 }
 
 function handleTouchEnd(e) {
   if (!trackpadActivo) return;
   if (!DOM.canvasContainer.contains(e.target)) return;
   e.preventDefault(); e.stopPropagation();
+
+  if (touchDragMode && touchDragStart) {
+    const t = e.changedTouches[0];
+    const endX = t ? t.clientX : touchDragStart.clientX;
+    const endY = t ? t.clientY : touchDragStart.clientY;
+    finalizarDragTrackpad(touchDragStart.clientX, touchDragStart.clientY, endX, endY);
+    touchDragMode = false;
+    touchDragStart = null;
+    touchFingers.clear();
+    touchActiveId = null;
+    touchTwoFinger = null;
+    return;
+  }
 
   for (let i = 0; i < e.changedTouches.length; i++) {
     const t = e.changedTouches[i];
@@ -2761,7 +2999,25 @@ function handleTouchEnd(e) {
     const wasSingle = (touchFingers.size === 1);
     const duration = Date.now() - f.startTime;
     const isTap = wasSingle && !f.moved && duration < 320 && t.identifier === touchActiveId;
-    if (isTap) dispararClickEnCursor();
+
+    if (isTap) {
+      const now = Date.now();
+      const dt = now - lastTapTime;
+      const dist = Math.hypot(t.clientX - lastTapX, t.clientY - lastTapY);
+      const isDoubleTap = dt < 320 && dist < 30;
+
+      if (isDoubleTap && measureMode &&
+          (measureTool === 'polyline' || measureTool === 'area') &&
+          measurePoints.length >= 2) {
+        lastTapTime = 0;
+        terminarMedicionActual();
+      } else {
+        dispararClickEnCursor();
+        lastTapTime = now;
+        lastTapX = t.clientX;
+        lastTapY = t.clientY;
+      }
+    }
     touchFingers.delete(t.identifier);
   }
 
