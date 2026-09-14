@@ -550,12 +550,11 @@ const DOM = {
 ============================================================ */
 let viewer = null;
 let wasmReady = false;
-let layersState = new Map();   // name -> { color, visible }
+let layersState = new Map();
 let gridVisible = true;
 let clickHideMode = false;
 const stats = { fileSize: 0, fileName: '', entityCount: 0 };
 
-/* Historial de cambios de capa */
 const layerHistory = [];
 let undoing = false;
 const MAX_HISTORY = 60;
@@ -591,7 +590,7 @@ function notificar(msg, tipo = 'ok') {
 function setStatus(text) { DOM.statusState.textContent = text; }
 
 /* ============================================================
-   FUENTES (validadas con firma binaria)
+   FUENTES
 ============================================================ */
 async function loadValidFonts(urls) {
   const valid = [];
@@ -624,7 +623,7 @@ async function getFonts() {
 }
 
 /* ============================================================
-   VISOR: creación
+   VISOR
 ============================================================ */
 function initViewer() {
   if (viewer) { try { viewer.Destroy(); } catch (e) {} viewer = null; }
@@ -637,11 +636,12 @@ function initViewer() {
 
 /* ============================================================
    VISIBILIDAD DE CAPAS
-   Manipulación directa de la escena usando _dxfViewerLayer
 ============================================================ */
 function setLayersVisible(changes) {
   const scene = viewer?.GetScene?.();
   if (!scene) return;
+  // Asegurar matrices actualizadas antes de tocar la escena
+  try { scene.updateMatrixWorld(true); } catch (e) {}
   for (const { name, show } of changes) {
     let found = false;
     for (const obj of scene.children) {
@@ -650,7 +650,6 @@ function setLayersVisible(changes) {
         found = true;
       }
     }
-    // Fallback: API pública ShowLayer
     if (!found) {
       try { viewer.ShowLayer(name, show); } catch (e) {}
     }
@@ -727,13 +726,13 @@ function updateToggleAllLabel() {
 }
 
 /* ============================================================
-   TOGGLE ALL — usa el API público + manipulación de escena
+   TOGGLE ALL
 ============================================================ */
 DOM.btnToggleAll.addEventListener('click', () => {
   const allNames = [...layersState.keys()];
   if (allNames.length === 0) return;
   const anyVisible = allNames.some(n => layersState.get(n).visible);
-  const target = !anyVisible; // si hay visibles → ocultar todas; si no → mostrar todas
+  const target = !anyVisible;
 
   const changes = [];
   for (const name of allNames) {
@@ -744,16 +743,13 @@ DOM.btnToggleAll.addEventListener('click', () => {
   }
   if (changes.length === 0) return;
 
-  // Aplicar a la escena
   setLayersVisible(changes.map(c => ({ name: c.name, show: c.newVisible })));
 
-  // Historial
   if (!undoing) {
     layerHistory.push(changes);
     if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
     updateUndoUI();
   }
-
   renderLayers();
   notificar(target ? 'Todas las capas visibles' : 'Todas las capas ocultas');
 });
@@ -766,8 +762,7 @@ function undoLayerChange() {
   const changes = layerHistory.pop();
   undoing = true;
   try {
-    const revert = changes.map(c => ({ name: c.name, show: c.oldVisible }));
-    setLayersVisible(revert);
+    setLayersVisible(changes.map(c => ({ name: c.name, show: c.oldVisible })));
     for (const c of changes) {
       const info = layersState.get(c.name);
       if (info) info.visible = c.oldVisible;
@@ -779,20 +774,18 @@ function undoLayerChange() {
   updateUndoUI();
   return true;
 }
-
 function updateUndoUI() {
   const n = layerHistory.length;
   DOM.btnUndo.disabled = n === 0;
   DOM.undoCount.textContent = n > 0 ? `(${n})` : '';
 }
-
 DOM.btnUndo.addEventListener('click', () => {
   if (undoLayerChange()) notificar('Cambio de capa deshecho');
   else notificar('Nada para deshacer', 'warn');
 });
 
 /* ============================================================
-   FIT VIEW — usa GetBounds() + GetOrigin() + FitView()
+   FIT VIEW
 ============================================================ */
 function fitView() {
   if (!viewer) return;
@@ -809,7 +802,6 @@ function fitView() {
     );
   } catch (e) {
     console.warn('FitView error:', e);
-    // Fallback: usar bounding box de la escena
     const scene = viewer.GetScene();
     const camera = viewer.GetCamera();
     if (!scene || !camera) return;
@@ -832,7 +824,7 @@ function fitView() {
 }
 
 /* ============================================================
-   ZOOM — dispatch de WheelEvent al canvas (OrbitControls)
+   ZOOM
 ============================================================ */
 function dispatchZoom(deltaY) {
   const canvas = viewer?.GetCanvas?.();
@@ -842,16 +834,12 @@ function dispatchZoom(deltaY) {
   const cy = rect.top + rect.height / 2;
   try {
     const evt = new WheelEvent('wheel', {
-      deltaY,
-      deltaMode: 0,
-      clientX: cx,
-      clientY: cy,
-      bubbles: true,
-      cancelable: true,
+      deltaY, deltaMode: 0,
+      clientX: cx, clientY: cy,
+      bubbles: true, cancelable: true,
     });
     canvas.dispatchEvent(evt);
   } catch (e) {
-    // Fallback para navegadores que no soportan WheelEvent constructor
     try {
       const evt = new MouseEvent('wheel', {
         clientX: cx, clientY: cy, bubbles: true, cancelable: true,
@@ -862,7 +850,6 @@ function dispatchZoom(deltaY) {
     } catch (e2) { console.warn('Zoom fallback failed:', e2); }
   }
 }
-
 function zoomIn() { dispatchZoom(-240); }
 function zoomOut() { dispatchZoom(240); }
 
@@ -871,15 +858,14 @@ DOM.btnZoomIn.addEventListener('click', () => { if (!DOM.btnZoomIn.disabled) zoo
 DOM.btnZoomOut.addEventListener('click', () => { if (!DOM.btnZoomOut.disabled) zoomOut(); });
 
 /* ============================================================
-   COORDENADAS — unproject del mouse a coordenadas del modelo
+   COORDENADAS
 ============================================================ */
 DOM.viewerContainer.addEventListener('mousemove', (e) => {
   if (!viewer) return;
-  const bounds = viewer.GetBounds();
   const origin = viewer.GetOrigin();
   const camera = viewer.GetCamera();
   const canvas = viewer.GetCanvas();
-  if (!bounds || !origin || !camera || !canvas) return;
+  if (!origin || !camera || !canvas) return;
 
   const rect = canvas.getBoundingClientRect();
   const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -921,8 +907,12 @@ DOM.btnGrid.addEventListener('click', () => {
 applyGrid();
 
 /* ============================================================
-   PICKING — identificar capa de un objeto 3D
+   PICKING POR PROYECCIÓN DE VÉRTICES A PANTALLA
+   - No depende del raycaster ni de layers ni de matrices
+   - Funciona con LineSegments, Line, Mesh, Points, cualquier cosa
 ============================================================ */
+
+/** Devuelve el nombre de la capa asociada a un Object3D, subiendo por la jerarquía */
 function getLayerNameFromObject(obj) {
   let cur = obj;
   let safety = 0;
@@ -930,39 +920,114 @@ function getLayerNameFromObject(obj) {
     if (cur._dxfViewerLayer && cur._dxfViewerLayer.name) {
       return cur._dxfViewerLayer.name;
     }
+    if (cur.userData) {
+      const ud = cur.userData;
+      const candidate = ud.layerName || ud.Layer || ud.layer || ud.LAYER;
+      if (candidate) {
+        if (typeof candidate === 'string') return candidate;
+        if (candidate.name) return candidate.name;
+      }
+    }
     cur = cur.parent;
   }
   return null;
 }
 
-function pickLayerAtPoint(clientX, clientY) {
+/** Cache de posiciones de mundo por objeto (se invalida al cargar archivo nuevo) */
+let worldPositionsCache = new WeakMap();
+function getWorldPositions(obj) {
+  if (worldPositionsCache.has(obj)) return worldPositionsCache.get(obj);
+  const geom = obj.geometry;
+  if (!geom || !geom.attributes || !geom.attributes.position) {
+    worldPositionsCache.set(obj, null);
+    return null;
+  }
+  const pos = geom.attributes.position;
+  const count = pos.count;
+  if (count === 0) {
+    worldPositionsCache.set(obj, null);
+    return null;
+  }
+  // Para performance: si hay muchísimos vértices, submuestreamos
+  const MAX_SAMPLES = 800;
+  const step = Math.max(1, Math.floor(count / MAX_SAMPLES));
+  const arr = [];
+  const v = new THREE.Vector3();
+  const m = obj.matrixWorld;
+  for (let i = 0; i < count; i += step) {
+    v.fromBufferAttribute(pos, i);
+    v.applyMatrix4(m);
+    arr.push(v.x, v.y, v.z);
+  }
+  worldPositionsCache.set(obj, arr);
+  return arr;
+}
+
+/** Proyecta un punto 3D de mundo a coordenadas de pantalla */
+function projectToScreen(x, y, z, camera, rect) {
+  const v = new THREE.Vector3(x, y, z);
+  v.project(camera);
+  return {
+    x: (v.x + 1) * 0.5 * rect.width,
+    y: (-v.y + 1) * 0.5 * rect.height,
+    // Opcional: chequear clip
+    behind: v.z > 1,
+  };
+}
+
+/** Picking por proximidad: encuentra la capa más cercana al click en pantalla */
+function pickLayerAtPoint(clientX, clientY, thresholdPx = 14) {
   if (!viewer) return null;
   const scene = viewer.GetScene();
   const camera = viewer.GetCamera();
   const canvas = viewer.GetCanvas();
   if (!scene || !camera || !canvas) return null;
 
-  const rect = canvas.getBoundingClientRect();
-  const raycaster = new THREE.Raycaster();
-  raycaster.params.Line = { threshold: 8 };
-  raycaster.params.Points = { threshold: 8 };
+  try { scene.updateMatrixWorld(true); } catch (e) {}
 
-  const offsets = [[0,0],[4,0],[-4,0],[0,4],[0,-4],[8,0],[-8,0],[0,8],[0,-8]];
-  for (const [dx, dy] of offsets) {
-    const ndc = new THREE.Vector2(
-      ((clientX + dx - rect.left) / rect.width) * 2 - 1,
-      -((clientY + dy - rect.top) / rect.height) * 2 + 1
-    );
-    raycaster.setFromCamera(ndc, camera);
-    const hits = raycaster.intersectObjects(scene.children, true);
-    if (hits.length > 0) {
-      const lname = getLayerNameFromObject(hits[0].object);
-      if (lname) return lname;
+  const rect = canvas.getBoundingClientRect();
+  const clickX = clientX - rect.left;
+  const clickY = clientY - rect.top;
+
+  let bestLayer = null;
+  let bestDist = thresholdPx;
+
+  const visit = (obj) => {
+    if (!obj) return;
+    // Solo considerar objetos visibles (y sus ancestros visibles)
+    let anc = obj;
+    let visible = true;
+    while (anc && anc !== scene) {
+      if (anc.visible === false) { visible = false; break; }
+      anc = anc.parent;
     }
-  }
-  return null;
+    if (visible) {
+      const positions = getWorldPositions(obj);
+      if (positions) {
+        const len = positions.length;
+        for (let i = 0; i < len; i += 3) {
+          const p = projectToScreen(positions[i], positions[i + 1], positions[i + 2], camera, rect);
+          if (p.behind) continue;
+          const d = Math.hypot(p.x - clickX, p.y - clickY);
+          if (d < bestDist) {
+            const lname = getLayerNameFromObject(obj);
+            if (lname) {
+              bestDist = d;
+              bestLayer = lname;
+            }
+          }
+        }
+      }
+    }
+    if (obj.children && obj.children.length) {
+      for (const c of obj.children) visit(c);
+    }
+  };
+  for (const c of scene.children) visit(c);
+  return bestLayer;
 }
 
+/** Picking por caja: encuentra todas las capas con geometría visible dentro del rect */
 function pickLayersInBox(x1, y1, x2, y2) {
   if (!viewer) return [];
   const scene = viewer.GetScene();
@@ -970,33 +1035,44 @@ function pickLayersInBox(x1, y1, x2, y2) {
   const canvas = viewer.GetCanvas();
   if (!scene || !camera || !canvas) return [];
 
+  try { scene.updateMatrixWorld(true); } catch (e) {}
+
   const rect = canvas.getBoundingClientRect();
-  const raycaster = new THREE.Raycaster();
-  raycaster.params.Line = { threshold: 4 };
-  raycaster.params.Points = { threshold: 4 };
+  const rx1 = Math.min(x1, x2) - rect.left;
+  const ry1 = Math.min(y1, y2) - rect.top;
+  const rx2 = Math.max(x1, x2) - rect.left;
+  const ry2 = Math.max(y1, y2) - rect.top;
 
   const layers = new Set();
-  const ndc = new THREE.Vector2();
-  const steps = 15;
-  const rx1 = Math.min(x1, x2);
-  const ry1 = Math.min(y1, y2);
-  const rx2 = Math.max(x1, x2);
-  const ry2 = Math.max(y1, y2);
 
-  for (let i = 0; i <= steps; i++) {
-    for (let j = 0; j <= steps; j++) {
-      const px = rx1 + (rx2 - rx1) * (i / steps);
-      const py = ry1 + (ry2 - ry1) * (j / steps);
-      ndc.x = ((px - rect.left) / rect.width) * 2 - 1;
-      ndc.y = -((py - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(ndc, camera);
-      const hits = raycaster.intersectObjects(scene.children, true);
-      if (hits.length > 0) {
-        const lname = getLayerNameFromObject(hits[0].object);
-        if (lname) layers.add(lname);
+  const visit = (obj) => {
+    if (!obj) return;
+    let anc = obj;
+    let visible = true;
+    while (anc && anc !== scene) {
+      if (anc.visible === false) { visible = false; break; }
+      anc = anc.parent;
+    }
+    if (visible) {
+      const positions = getWorldPositions(obj);
+      if (positions) {
+        const len = positions.length;
+        for (let i = 0; i < len; i += 3) {
+          const p = projectToScreen(positions[i], positions[i + 1], positions[i + 2], camera, rect);
+          if (p.behind) continue;
+          if (p.x >= rx1 && p.x <= rx2 && p.y >= ry1 && p.y <= ry2) {
+            const lname = getLayerNameFromObject(obj);
+            if (lname) layers.add(lname);
+            break; // un vértice adentro alcanza
+          }
+        }
       }
     }
-  }
+    if (obj.children && obj.children.length) {
+      for (const c of obj.children) visit(c);
+    }
+  };
+  for (const c of scene.children) visit(c);
   return [...layers];
 }
 
@@ -1014,7 +1090,6 @@ DOM.btnClickHide.addEventListener('click', () => {
   }
 });
 
-/* Selección por pointer */
 let selState = null;
 let selRectEl = null;
 
@@ -1057,24 +1132,21 @@ document.addEventListener('pointerup', (e) => {
   if (e.button !== 0) return;
 
   if (!start.moved) {
-    // Clic simple
     const lname = pickLayerAtPoint(e.clientX, e.clientY);
     if (!lname) { notificar('No se encontró objeto aquí', 'warn'); return; }
     const info = layersState.get(lname);
     if (!info) { notificar(`Capa "${lname}" no encontrada`, 'warn'); return; }
     if (!info.visible) { notificar(`La capa "${lname}" ya está oculta`, 'warn'); return; }
-    const changes = [{ name: lname, oldVisible: true, newVisible: false }];
     info.visible = false;
     setLayersVisible([{ name: lname, show: false }]);
     if (!undoing) {
-      layerHistory.push(changes);
+      layerHistory.push([{ name: lname, oldVisible: true, newVisible: false }]);
       if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
       updateUndoUI();
     }
     renderLayers();
     notificar(`Capa apagada: ${lname}`);
   } else {
-    // Selección por caja
     const layersInBox = pickLayersInBox(start.startX, start.startY, e.clientX, e.clientY);
     if (layersInBox.length === 0) { notificar('Ningún objeto dentro del cuadro', 'warn'); return; }
     const changes = [];
@@ -1140,6 +1212,9 @@ async function processFile(file) {
     DOM.loadingSub.textContent = 'Optimizando geometría para WebGL.';
     initViewer();
 
+    // Reset cache de picking al cargar nuevo archivo
+    worldPositionsCache = new WeakMap();
+
     const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
     const dxfUrl = URL.createObjectURL(dxfBlob);
     const loadOpts = { url: dxfUrl };
@@ -1147,7 +1222,6 @@ async function processFile(file) {
     await viewer.Load(loadOpts);
     URL.revokeObjectURL(dxfUrl);
 
-    // Capas
     layersState.clear();
     layerHistory.length = 0;
     updateUndoUI();
@@ -1159,7 +1233,6 @@ async function processFile(file) {
     } catch (e) { console.warn('No se pudieron leer capas:', e); }
     renderLayers();
 
-    // Stats
     stats.fileSize = file.size;
     stats.fileName = file.name;
     DOM.fileName.textContent = file.name;
@@ -1288,19 +1361,16 @@ document.addEventListener('click', (e) => {
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
 
-  // Ctrl+Z: deshacer cambio de capa
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
     e.preventDefault();
     if (undoLayerChange()) notificar('Cambio de capa deshecho');
     else notificar('Nada para deshacer', 'warn');
     return;
   }
-  // Ctrl+Y: bloquear rehacer por defecto
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
     e.preventDefault();
     return;
   }
-  // Ctrl+O: abrir
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
     e.preventDefault(); openFileDialog(); return;
   }
@@ -1321,7 +1391,6 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '-' || e.key === '_') { if (!DOM.btnZoomOut.disabled) zoomOut(); }
 });
 
-/* UI inicial */
 updateUndoUI();
 </script>
 </body>
