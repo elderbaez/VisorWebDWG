@@ -2,8 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Visor web DWG/DXF</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Visor web DWG/DXF · Motor propio</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,22 +25,39 @@
   --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
+html, body {
+  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  overscroll-behavior: none;
+}
 body {
   font-family: var(--font); background-color: var(--bg); color: var(--text-main);
-  overflow: hidden; height: 100vh; width: 100vw;
-  -webkit-font-smoothing: antialiased; user-select: none;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .side-panel::-webkit-scrollbar { width: 6px; }
 .side-panel::-webkit-scrollbar-track { background: transparent; }
 .side-panel::-webkit-scrollbar-thumb { background: rgba(139,148,158,0.28); border-radius: 3px; }
 
-#pantalla-visor { display: flex; flex-direction: column; height: 100vh; width: 100vw; background: var(--bg); position: relative; }
+#pantalla-visor {
+  display: flex; flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  background: var(--bg); position: relative;
+}
 
 .viewer-top-bar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.75rem 1.25rem; background: var(--panel); border-bottom: 1px solid var(--border);
   z-index: 50; flex-shrink: 0;
+  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
 }
 .app-title { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; color: var(--text-main); }
 .app-logo-svg { width: 22px; height: 22px; fill: var(--accent); }
@@ -144,6 +164,12 @@ body {
   flex: 1; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; min-width: 0;
 }
+.layer-lw {
+  font-size: 0.6rem; font-weight: 700; color: var(--text-dim);
+  background: var(--panel-card); padding: 1px 5px; border-radius: 3px;
+  border: 1px solid var(--border); flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
 .layer-empty {
   font-size: 0.75rem; color: var(--text-dim); text-align: center;
   padding: 1rem 0.5rem; line-height: 1.5; font-weight: 500;
@@ -159,15 +185,6 @@ body {
 #measure-overlay {
   position: absolute; inset: 0; pointer-events: none; z-index: 8;
 }
-
-.grid-overlay {
-  position: absolute; inset: 0; pointer-events: none; z-index: 6;
-  background-image:
-    linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-.grid-overlay.oculto { display: none; }
 
 .selection-rect {
   position: fixed; border: 1.5px dashed var(--danger);
@@ -309,11 +326,7 @@ body {
   transition: opacity 0.3s ease;
   pointer-events: none;
 }
-.empty-state.hidden {
-  opacity: 0;
-  pointer-events: none;
-  visibility: hidden;
-}
+.empty-state.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
 .empty-state .open-btn { pointer-events: auto; margin-top: 0.5rem; }
 .empty-state.hidden .open-btn { pointer-events: none; }
 .empty-state-icon {
@@ -410,9 +423,13 @@ body {
 .info-link.whatsapp .info-link-label small { color: #25D366; opacity: 0.85; }
 
 .viewer-status-bar {
-  height: 34px; background: var(--panel); border-top: 1px solid var(--border);
+  height: auto;
+  min-height: 34px;
+  background: var(--panel); border-top: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 1rem; font-size: 0.72rem; font-weight: 500;
+  padding: 0 1rem;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  font-size: 0.72rem; font-weight: 500;
   color: var(--text-secondary); z-index: 50; flex-shrink: 0;
 }
 .status-left { display: flex; gap: 1.5rem; align-items: center; overflow: hidden; min-width: 0; }
@@ -450,6 +467,24 @@ body {
 .notificacion.warn { background: var(--warning); color: #1a1a1a; }
 @keyframes slideUp { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
+/* Touch: deshabilitar gestos nativos del navegador sobre el canvas */
+#viewer-container, #measure-overlay {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Aumentar el área táctil de los botones en móvil */
+@media (hover: none) and (pointer: coarse) {
+  .cad-tool-btn { min-height: 34px; padding: 6px 10px; }
+  .btn { min-height: 38px; }
+  .layer-item { padding: 0.6rem 0.55rem; }
+  .layer-item input[type="checkbox"] { width: 18px; height: 18px; }
+  .snap-btn { width: 38px; height: 38px; }
+  .measure-tool-btn { padding: 0.55rem 0.85rem; }
+}
+
 @media (max-width: 900px) {
   .btn-sidebar-toggle { display: inline-flex; }
   .side-panel {
@@ -459,13 +494,13 @@ body {
     width: 280px;
   }
   .side-panel.colapsado { transform: translateX(-100%); margin-left: 0; }
-  .viewer-top-bar { padding: 0.55rem 0.75rem; gap: 0.4rem; }
+  .viewer-top-bar { padding: 0.55rem 0.75rem; gap: 0.4rem; padding-top: calc(0.55rem + env(safe-area-inset-top, 0px)); }
   .app-title { font-size: 0.9rem; gap: 0.4rem; }
   .app-subtitle { display: none; }
   .btn span.btn-label { display: none; }
   .btn { padding: 0.45rem 0.6rem; }
   .viewer-actions { gap: 0.35rem; }
-  .viewer-status-bar { padding: 0 0.5rem; font-size: 0.65rem; }
+  .viewer-status-bar { padding: 0 0.5rem; font-size: 0.65rem; padding-bottom: env(safe-area-inset-bottom, 0px); }
   .status-left { gap: 0.75rem; }
   .cad-tool-btn span:not(.badge) { display: none; }
   .cad-tool-btn { padding: 4px 6px; }
@@ -485,7 +520,7 @@ body {
       <div class="app-title">
         <svg class="app-logo-svg" viewBox="0 0 24 24"><path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z"/></svg>
         <span>Visor web DWG/DXF</span>
-        <span class="app-subtitle">Profesional</span>
+        <span class="app-subtitle">Motor propio</span>
       </div>
     </div>
     <div class="viewer-actions">
@@ -550,13 +585,26 @@ body {
           <div class="layer-empty" id="layerEmpty">Cargá un archivo DWG/DXF para ver las capas del dibujo.</div>
         </div>
       </div>
+
+      <div class="panel-section">
+        <div class="section-header">
+          <svg viewBox="0 0 24 24" stroke-width="1.75" fill="none"><line x1="3" y1="6" x2="21" y2="6" stroke-width="1"/><line x1="3" y1="12" x2="21" y2="12" stroke-width="2"/><line x1="3" y1="18" x2="21" y2="18" stroke-width="3.5"/></svg>
+          Grosor de línea
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <input type="range" id="lwSlider" min="0.5" max="4" step="0.1" value="1.5" style="flex: 1; accent-color: var(--accent);">
+          <span id="lwValue" style="font-size: 0.75rem; font-weight: 700; color: var(--accent); min-width: 42px; text-align: right; font-variant-numeric: tabular-nums;">1.5×</span>
+        </div>
+        <div style="font-size: 0.68rem; color: var(--text-dim); margin-top: 0.5rem; line-height: 1.4;">
+          Escala global. Los lineweights de cada capa (code 370) se respetan proporcionalmente.
+        </div>
+      </div>
     </div>
 
     <div class="main-area">
       <div class="canvas-container" id="canvasContainer">
         <div id="viewer-container"></div>
         <canvas id="measure-overlay"></canvas>
-        <div class="grid-overlay" id="gridOverlay"></div>
 
         <div class="snap-marker oculto" id="snapMarker"><span class="snap-marker-label" id="snapMarkerLabel"></span></div>
 
@@ -564,7 +612,7 @@ body {
           <div class="measure-header">
             <span>Medición</span>
             <div class="measure-header-actions">
-              <button class="measure-clear-btn" id="btnMeasureClearHistory" title="Borrar historial de mediciones">Limpiar</button>
+              <button class="measure-clear-btn" id="btnMeasureClearHistory" title="Borrar historial">Limpiar</button>
               <button class="measure-close" id="btnMeasureClose">×</button>
             </div>
           </div>
@@ -629,7 +677,7 @@ body {
             </svg>
           </div>
           <h2>Visor web DWG/DXF</h2>
-          <p>Arrastrá un archivo <b>.dwg</b> o <b>.dxf</b> aquí o abrí uno desde tu equipo. Compatible con R13 a R2018.</p>
+          <p>Arrastrá un archivo <b>.dwg</b> o <b>.dxf</b> aquí o abrí uno desde tu equipo. Motor propio con grosores reales.</p>
           <button class="btn btn-accent open-btn" id="btnOpenEmpty">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
             Abrir DWG/DXF
@@ -699,9 +747,6 @@ body {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
         <span>Cuadrícula</span>
       </button>
-      <button class="cad-tool-btn" id="btnRegen" title="Refrescar vista (R)" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-      </button>
       <div class="status-divider"></div>
       <button class="cad-tool-btn" id="btnToggleAll" title="Ocultar/Mostrar todas las capas" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -725,19 +770,22 @@ body {
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-    "dwgdxf": "https://cdn.jsdelivr.net/npm/dwgdxf@2.0.1/+esm",
-    "dxf-viewer": "https://cdn.jsdelivr.net/npm/dxf-viewer@1.0.48/+esm"
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+    "dwgdxf": "https://cdn.jsdelivr.net/npm/dwgdxf@2.0.1/+esm"
   }
 }
 </script>
 
 <script type="module">
 import * as THREE from 'three';
-window.THREE = THREE;
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { init as dwgInit, convertDwgToDxf, CDN_WASM_BASE } from 'dwgdxf';
 
-import { init, convertDwgToDxf, CDN_WASM_BASE } from 'dwgdxf';
-import { DxfViewer } from 'dxf-viewer';
-
+/* ============================================================
+   DOM
+============================================================ */
 const DOM = {
   btnOpen: document.getElementById('btnOpen'),
   btnOpenEmpty: document.getElementById('btnOpenEmpty'),
@@ -762,7 +810,6 @@ const DOM = {
   btnZoomOut: document.getElementById('btnZoomOut'),
   btnFit: document.getElementById('btnFit'),
   btnGrid: document.getElementById('btnGrid'),
-  btnRegen: document.getElementById('btnRegen'),
   btnClickHide: document.getElementById('btnClickHide'),
   fileInput: document.getElementById('fileInput'),
   sidePanel: document.getElementById('sidePanel'),
@@ -777,7 +824,6 @@ const DOM = {
   layerCount: document.getElementById('layerCount'),
   canvasContainer: document.getElementById('canvasContainer'),
   viewerContainer: document.getElementById('viewer-container'),
-  gridOverlay: document.getElementById('gridOverlay'),
   emptyState: document.getElementById('emptyState'),
   dragOverlay: document.getElementById('dragOverlay'),
   loadingOverlay: document.getElementById('loadingOverlay'),
@@ -789,36 +835,43 @@ const DOM = {
   statusCoords: document.getElementById('statusCoords'),
   statusX: document.getElementById('statusX'),
   statusY: document.getElementById('statusY'),
+  lwSlider: document.getElementById('lwSlider'),
+  lwValue: document.getElementById('lwValue'),
 };
 
-let viewer = null;
-let wasmReady = false;
-let layersState = new Map();
-let gridVisible = true;
-let clickHideMode = false;
-let pdfAreaMode = false;
-let measureMode = false;
+/* ============================================================
+   ESTADO GLOBAL
+============================================================ */
+const state = {
+  layers: new Map(),
+  segments: [],
+  snapPoints: [],
+  texts: [],
+  bounds: null,
+  view: { x: 0, y: 0, scale: 1 },
+  widthScale: 1.5,
+};
+
 const stats = { fileSize: 0, fileName: '', entityCount: 0 };
 const layerHistory = [];
-let undoing = false;
 const MAX_HISTORY = 60;
+let undoing = false;
 
-let measureTool = 'distance';
-let measurePoints = [];
-let measureSnaps = new Set(['endpoint', 'midpoint', 'center', 'quadrant', 'nearest', 'intersection', 'perpendicular', 'fictitious']);
-let lastSnapPoint = null;
-let mouseScreen = { x: 0, y: 0 };
-let rawDxfText = '';
-let measureRedrawRAF = null;
+let wasmReady = false;
 
-// Geometría extraída para mediciones y exportación PDF
-let snapPoints = [];
-let lineSegments = [];
-let textEntities = [];
-let measureHistory = [];
-let measureHistorySeq = 0;
-const SNAP_LABELS = { endpoint: 'Extremo', midpoint: 'Medio', center: 'Centro', quadrant: 'Cuadrante', nearest: 'Cercano', intersection: 'Intersección', fictitious: 'Extensión', perpendicular: 'Perpendicular' };
+/* ============================================================
+   THREE
+============================================================ */
+let renderer = null;
+let scene = null;
+let camera = null;
+let gridHelper = null;
+let layerObjects = new Map();
+let lineMaterials = [];
 
+/* ============================================================
+   UTILS
+============================================================ */
 function fmtBytes(b) {
   if (b < 1024) return b + ' B';
   if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
@@ -830,7 +883,6 @@ function fmtNum(n) {
   if (abs >= 1) return n.toFixed(2);
   return n.toFixed(3);
 }
-function numToHex(c) { return '#' + (c >>> 0).toString(16).padStart(6, '0').slice(-6); }
 function notificar(msg, tipo = 'ok') {
   const n = document.createElement('div');
   n.className = 'notificacion' + (tipo === 'error' ? ' error' : tipo === 'warn' ? ' warn' : '');
@@ -844,615 +896,269 @@ function notificar(msg, tipo = 'ok') {
 }
 function setStatus(text) { DOM.statusState.textContent = text; }
 
-async function loadValidFonts(urls) {
-  const valid = [];
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { mode: 'cors' });
-      if (!res.ok) continue;
-      const buf = await res.arrayBuffer();
-      if (buf.byteLength < 12) continue;
-      const sig = new DataView(buf).getUint32(0, false);
-      const ok = sig === 0x00010000 || sig === 0x4F54544F ||
-                 sig === 0x74727565 || sig === 0x74746366;
-      if (!ok) continue;
-      valid.push(URL.createObjectURL(new Blob([buf], { type: 'font/ttf' })));
-    } catch (e) {}
-  }
-  return valid;
-}
-const FONT_CANDIDATES = [
-  'https://cdn.jsdelivr.net/npm/@expo-google-fonts/roboto@0.2.3/Roboto_400Regular.ttf',
-  'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Regular.ttf',
-  'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf',
-  'https://cdn.jsdelivr.net/gh/googlefonts/roboto@main/src/hinted/Roboto-Regular.ttf',
-];
-let cachedFonts = null;
-async function getFonts() {
-  if (cachedFonts) return cachedFonts;
-  cachedFonts = await loadValidFonts(FONT_CANDIDATES);
-  return cachedFonts;
-}
-
-function initViewer() {
-  if (viewer) { try { viewer.Destroy(); } catch (e) {} viewer = null; }
-  viewer = new DxfViewer(DOM.viewerContainer, {
-    clearColor: new THREE.Color(0x0d1117),
-    autoResize: true,
-  });
-  setTimeout(() => configureMouseControls(), 100);
-  setTimeout(() => {
-    try {
-      const controls = viewer.controls || viewer._controls;
-      if (controls && controls.addEventListener) {
-        controls.addEventListener('change', () => {
-          if (measureRedrawRAF) cancelAnimationFrame(measureRedrawRAF);
-          measureRedrawRAF = requestAnimationFrame(() => {
-            measureRedrawRAF = null;
-            drawMeasurePreview();
-          });
-        });
-      }
-    } catch (e) {}
-  }, 200);
-  return viewer;
-}
-
-function configureMouseControls() {
-  if (!viewer) return;
-  const controls = viewer.controls || viewer._controls;
-  if (!controls) { setTimeout(configureMouseControls, 200); return; }
-  try {
-    controls.mouseButtons = {
-      LEFT: null,
-      MIDDLE: THREE.MOUSE.PAN,
-      RIGHT: THREE.MOUSE.PAN,
-    };
-    controls.enablePan = true;
-    controls.enableZoom = true;
-    controls.enableRotate = false;
-    controls.panSpeed = 1.0;
-    controls.zoomSpeed = 1.2;
-  } catch (e) {}
-}
-
-function syncLayersStateFromScene() {
-  const scene = viewer?.GetScene?.();
-  if (!scene) return;
-  const sceneVis = new Map();
-  for (const obj of scene.children) {
-    const layer = obj._dxfViewerLayer;
-    if (layer && layer.name) {
-      const n = layer.name;
-      const prev = sceneVis.get(n);
-      sceneVis.set(n, prev === undefined ? obj.visible : (prev || obj.visible));
-    }
-  }
-  for (const [name, info] of layersState) {
-    if (sceneVis.has(name)) info.visible = sceneVis.get(name);
-  }
-}
-
-function setLayersVisible(changes) {
-  const scene = viewer?.GetScene?.();
-  if (!scene) return;
-  try { scene.updateMatrixWorld(true); } catch (e) {}
-  for (const { name, show } of changes) {
-    let found = false;
-    for (const obj of scene.children) {
-      if (obj._dxfViewerLayer && obj._dxfViewerLayer.name === name) {
-        obj.visible = show;
-        found = true;
-      }
-    }
-    if (!found) {
-      try { viewer.ShowLayer(name, show); } catch (e) {}
-    }
-  }
-  viewer.Render();
-}
-
-function renderLayers() {
-  DOM.layerList.innerHTML = '';
-  if (layersState.size === 0) {
-    DOM.layerList.appendChild(DOM.layerEmpty);
-    DOM.layerEmpty.style.display = '';
-    DOM.layerCount.textContent = '0';
-    DOM.btnToggleAll.disabled = true;
-    DOM.btnClickHide.disabled = true;
-    return;
-  }
-  DOM.layerEmpty.style.display = 'none';
-  DOM.layerCount.textContent = String(layersState.size);
-  DOM.btnToggleAll.disabled = false;
-  DOM.btnClickHide.disabled = false;
-  updateToggleAllIcon();
-
-  const entries = [...layersState.entries()].sort((a, b) => {
-    if (a[1].visible !== b[1].visible) return a[1].visible ? -1 : 1;
-    return a[0].localeCompare(b[0]);
-  });
-
-  for (const [name, info] of entries) {
-    const item = document.createElement('label');
-    item.className = 'layer-item';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = info.visible;
-    cb.addEventListener('change', () => {
-      const old = info.visible;
-      info.visible = cb.checked;
-      if (!undoing) {
-        layerHistory.push([{ name, oldVisible: old, newVisible: cb.checked }]);
-        if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
-        updateUndoUI();
-      }
-      setLayersVisible([{ name, show: cb.checked }]);
-      updateToggleAllIcon();
-    });
-    const sw = document.createElement('span');
-    sw.className = 'layer-color';
-    sw.style.background = numToHex(info.color);
-    const nm = document.createElement('span');
-    nm.className = 'layer-name';
-    nm.textContent = name;
-    nm.title = name;
-    item.appendChild(cb);
-    item.appendChild(sw);
-    item.appendChild(nm);
-    DOM.layerList.appendChild(item);
-  }
-}
-
-function updateToggleAllIcon() {
-  const total = layersState.size;
-  const visibles = [...layersState.values()].filter(v => v.visible).length;
-  const allVisible = visibles === total && total > 0;
-  const svg = DOM.btnToggleAll.querySelector('svg');
-  if (svg) {
-    if (allVisible) {
-      svg.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
-    } else {
-      svg.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
-    }
-  }
-  DOM.btnToggleAll.title = allVisible ? 'Ocultar todas las capas' : 'Mostrar todas las capas';
-}
-
-DOM.btnToggleAll.addEventListener('click', () => {
-  if (!viewer || layersState.size === 0) return;
-  syncLayersStateFromScene();
-  const allNames = [...layersState.keys()];
-  const anyVisible = allNames.some(n => layersState.get(n).visible);
-  const target = !anyVisible;
-  const changes = [];
-  for (const name of allNames) {
-    const info = layersState.get(name);
-    if (info.visible === target) continue;
-    changes.push({ name, oldVisible: info.visible, newVisible: target });
-    info.visible = target;
-  }
-  if (changes.length === 0) {
-    notificar(target ? 'Todas las capas ya están visibles' : 'Todas las capas ya están ocultas', 'warn');
-    return;
-  }
-  setLayersVisible(changes.map(c => ({ name: c.name, show: c.newVisible })));
-  if (!undoing) {
-    layerHistory.push(changes);
-    if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
-    updateUndoUI();
-  }
-  renderLayers();
-  notificar(target ? `Mostradas ${changes.length} capa(s)` : `Ocultadas ${changes.length} capa(s)`);
-});
-
-function undoLayerChange() {
-  if (layerHistory.length === 0) return false;
-  const changes = layerHistory.pop();
-  undoing = true;
-  try {
-    setLayersVisible(changes.map(c => ({ name: c.name, show: c.oldVisible })));
-    for (const c of changes) {
-      const info = layersState.get(c.name);
-      if (info) info.visible = c.oldVisible;
-    }
-    renderLayers();
-  } finally { undoing = false; }
-  updateUndoUI();
-  return true;
-}
-function updateUndoUI() {
-  const n = layerHistory.length;
-  DOM.btnUndo.disabled = n === 0;
-  if (n > 0) { DOM.undoBadge.style.display = ''; DOM.undoBadge.textContent = String(n); }
-  else { DOM.undoBadge.style.display = 'none'; }
-}
-DOM.btnUndo.addEventListener('click', () => {
-  if (undoLayerChange()) notificar('Cambio de capa deshecho');
-  else notificar('Nada para deshacer', 'warn');
-});
-
-function fitView() {
-  if (!viewer) return;
-  const bounds = viewer.GetBounds();
-  const origin = viewer.GetOrigin();
-  if (!bounds || !origin) return;
-  try {
-    viewer.FitView(bounds.minX - origin.x, bounds.maxX - origin.x,
-                   bounds.minY - origin.y, bounds.maxY - origin.y, 0.1);
-  } catch (e) {
-    const scene = viewer.GetScene();
-    const camera = viewer.GetCamera();
-    if (!scene || !camera) return;
-    const box = new THREE.Box3().setFromObject(scene);
-    if (box.isEmpty()) return;
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, 1e-3);
-    const fov = camera.fov * (Math.PI / 180);
-    const dist = (maxDim / 2) / Math.tan(fov / 2) * 1.3;
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    camera.position.copy(center).sub(dir.multiplyScalar(dist));
-    camera.near = Math.max(0.01, maxDim / 1000);
-    camera.far = Math.max(1000, maxDim * 20);
-    camera.updateProjectionMatrix();
-    camera.lookAt(center);
-    viewer.Render();
-  }
-  setTimeout(() => drawMeasurePreview(), 50);
-}
-
-function zoomAtScreenPoint(factor, clientX, clientY) {
-  if (!viewer) return;
-  const camera = viewer.GetCamera();
-  const controls = viewer.controls;
-  if (!camera || !controls) return;
-  const canvas = viewer.GetCanvas();
-  const rect = canvas.getBoundingClientRect();
-  const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
-  const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-  const zoomPoint = new THREE.Vector3(ndcX, ndcY, 1).unproject(camera);
-  const oldZoom = camera.zoom;
-  const newZoom = Math.max(0.0001, Math.min(100000, oldZoom * factor));
-  camera.zoom = newZoom;
-  const camPos = camera.position;
-  const dx = zoomPoint.x - camPos.x;
-  const dy = zoomPoint.y - camPos.y;
-  const scale = 1 - oldZoom / newZoom;
-  camPos.x += dx * scale;
-  camPos.y += dy * scale;
-  controls.target.x += dx * scale;
-  controls.target.y += dy * scale;
-  camera.updateProjectionMatrix();
-  camera.updateMatrixWorld();
-  controls.update();
-  viewer.Render();
-  requestAnimationFrame(() => drawMeasurePreview());
-}
-
-function zoomIn() {
-  const rect = DOM.viewerContainer.getBoundingClientRect();
-  zoomAtScreenPoint(1.25, rect.left + rect.width / 2, rect.top + rect.height / 2);
-}
-function zoomOut() {
-  const rect = DOM.viewerContainer.getBoundingClientRect();
-  zoomAtScreenPoint(0.8, rect.left + rect.width / 2, rect.top + rect.height / 2);
-}
-
-DOM.btnFit.addEventListener('click', () => { if (!DOM.btnFit.disabled) fitView(); });
-DOM.btnZoomIn.addEventListener('click', () => { if (!DOM.btnZoomIn.disabled) zoomIn(); });
-DOM.btnZoomOut.addEventListener('click', () => { if (!DOM.btnZoomOut.disabled) zoomOut(); });
-
-function regen() {
-  if (!viewer) return;
-  const scene = viewer.GetScene();
-  if (scene) { try { scene.updateMatrixWorld(true); } catch (e) {} }
-  try { viewer.Render(); } catch (e) {}
-  try { window.dispatchEvent(new Event('resize')); } catch (e) {}
-  notificar('Vista refrescada');
-  setTimeout(() => drawMeasurePreview(), 50);
-}
-DOM.btnRegen.addEventListener('click', () => { if (!DOM.btnRegen.disabled) regen(); });
-
-DOM.viewerContainer.addEventListener('mousemove', (e) => {
-  if (!viewer) return;
-  const origin = viewer.GetOrigin();
-  const camera = viewer.GetCamera();
-  const canvas = viewer.GetCanvas();
-  if (!origin || !camera || !canvas) return;
-  const rect = canvas.getBoundingClientRect();
-  const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-  const v = new THREE.Vector3(ndcX, ndcY, 1).unproject(camera);
-  DOM.statusCoords.style.display = '';
-  DOM.statusX.textContent = `X: ${fmtNum(v.x + origin.x)} m`;
-  DOM.statusY.textContent = `Y: ${fmtNum(v.y + origin.y)} m`;
-});
-DOM.viewerContainer.addEventListener('mouseleave', () => {
-  DOM.statusCoords.style.display = 'none';
-});
-
-function applyGrid() {
-  if (gridVisible) { DOM.gridOverlay.classList.remove('oculto'); DOM.btnGrid.classList.add('active'); }
-  else { DOM.gridOverlay.classList.add('oculto'); DOM.btnGrid.classList.remove('active'); }
-}
-DOM.btnGrid.addEventListener('click', () => { gridVisible = !gridVisible; applyGrid(); });
-applyGrid();
-
-function pointSegDist2(px, py, x1, y1, x2, y2) {
-  const dx = x2 - x1, dy = y2 - y1;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-9) { const ex = px - x1, ey = py - y1; return ex * ex + ey * ey; }
-  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
-  if (t < 0) t = 0; else if (t > 1) t = 1;
-  const cx = x1 + t * dx, cy = y1 + t * dy;
-  const ex = px - cx, ey = py - cy;
-  return ex * ex + ey * ey;
-}
-
-function getLayerNameFromObject(obj) {
-  let cur = obj, safety = 0;
-  while (cur && safety++ < 30) {
-    if (cur._dxfViewerLayer && cur._dxfViewerLayer.name) return cur._dxfViewerLayer.name;
-    if (cur.userData) {
-      const ud = cur.userData;
-      const candidate = ud.layerName || ud.Layer || ud.layer || ud.LAYER;
-      if (candidate) { if (typeof candidate === 'string') return candidate; if (candidate.name) return candidate.name; }
-    }
-    cur = cur.parent;
-  }
-  return null;
-}
-
-function pickLayerAtPoint(clientX, clientY, threshold = 14) {
-  if (!viewer) return null;
-  const scene = viewer.GetScene();
-  const camera = viewer.GetCamera();
-  const canvas = viewer.GetCanvas();
-  if (!scene || !camera || !canvas) return null;
-  try { scene.updateMatrixWorld(true); } catch (e) {}
-  const rect = canvas.getBoundingClientRect();
-  const clickX = clientX - rect.left, clickY = clientY - rect.top;
-  const thresh2 = threshold * threshold;
-  let bestLayer = null, bestDist2 = thresh2;
-  const halfW = rect.width * 0.5, halfH = rect.height * 0.5;
-  const v = new THREE.Vector3();
-  const MAX_SAMPLES = 15000;
-  const visit = (obj) => {
-    if (!obj) return;
-    let anc = obj, visible = true;
-    while (anc && anc !== scene) { if (anc.visible === false) { visible = false; break; } anc = anc.parent; }
-    if (!visible) return;
-    const geom = obj.geometry;
-    const pos = geom && geom.attributes && geom.attributes.position;
-    if (pos && pos.count > 0) {
-      const m = obj.matrixWorld;
-      const count = pos.count;
-      const project = (i) => {
-        v.fromBufferAttribute(pos, i); v.applyMatrix4(m); v.project(camera);
-        return { x: (v.x + 1) * halfW, y: (-v.y + 1) * halfH, behind: v.z > 1 };
-      };
-      if (obj.isLineSegments) {
-        const segCount = Math.floor(count / 2);
-        const segStep = Math.max(1, Math.ceil(segCount / MAX_SAMPLES));
-        for (let s = 0; s < segCount; s += segStep) {
-          const a = project(s * 2), b = project(s * 2 + 1);
-          if (a.behind || b.behind) continue;
-          const d2 = pointSegDist2(clickX, clickY, a.x, a.y, b.x, b.y);
-          if (d2 < bestDist2) { const lname = getLayerNameFromObject(obj); if (lname) { bestDist2 = d2; bestLayer = lname; } }
-        }
-      } else if (obj.isLine) {
-        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
-        let prev = null;
-        for (let i = 0; i < count; i += vStep) {
-          const p = project(i);
-          if (prev && !prev.behind && !p.behind) {
-            const d2 = pointSegDist2(clickX, clickY, prev.x, prev.y, p.x, p.y);
-            if (d2 < bestDist2) { const lname = getLayerNameFromObject(obj); if (lname) { bestDist2 = d2; bestLayer = lname; } }
-          }
-          prev = p;
-        }
-      } else {
-        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
-        for (let i = 0; i < count; i += vStep) {
-          const p = project(i);
-          if (p.behind) continue;
-          const dx = p.x - clickX, dy = p.y - clickY;
-          const d2 = dx * dx + dy * dy;
-          if (d2 < bestDist2) { const lname = getLayerNameFromObject(obj); if (lname) { bestDist2 = d2; bestLayer = lname; } }
-        }
-      }
-    }
-    if (obj.children) for (const c of obj.children) visit(c);
+/* Paleta ACI simplificada */
+const ACI_1_9 = ['#000000', '#FF0000', '#FFFF00', '#00FF00', '#00FFFF',
+                 '#0000FF', '#FF00FF', '#FFFFFF', '#808080', '#C0C0C0'];
+function hslToHex(h, s, l) {
+  l /= 100;
+  const a = s * Math.min(l, 1 - l) / 100;
+  const f = n => {
+    const k = (n + h / 30) % 12;
+    const c = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(255 * c).toString(16).padStart(2, '0');
   };
-  for (const c of scene.children) visit(c);
-  return bestLayer;
+  return `#${f(0)}${f(8)}${f(4)}`;
 }
-
-function projectWorldToScreen(x, y, camera, canvasRect) {
-  const origin = viewer.GetOrigin();
-  const v = new THREE.Vector3(x - origin.x, y - origin.y, 0);
-  v.project(camera);
-  return { x: (v.x + 1) * 0.5 * canvasRect.width, y: (-v.y + 1) * 0.5 * canvasRect.height };
-}
-
-function projectScreenToWorld(clientX, clientY) {
-  const camera = viewer.GetCamera();
-  const canvas = viewer.GetCanvas();
-  const origin = viewer.GetOrigin();
-  if (!camera || !canvas || !origin) return null;
-  const rect = canvas.getBoundingClientRect();
-  const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
-  const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-  const v = new THREE.Vector3(ndcX, ndcY, 1).unproject(camera);
-  return { x: v.x + origin.x, y: v.y + origin.y, z: 0 };
+function aciToHex(aci, layerAci) {
+  let idx = aci;
+  if (idx === 0 || idx === 256 || !idx) idx = layerAci || 7;
+  if (idx <= 0) idx = 7;
+  if (idx >= 1 && idx <= 9) return ACI_1_9[idx];
+  if (idx >= 250 && idx <= 255) {
+    const v = Math.round(255 - (idx - 250) * 42);
+    const h = v.toString(16).padStart(2, '0');
+    return `#${h}${h}${h}`;
+  }
+  const i = idx - 10;
+  const hue = ((i % 10) * 36 + Math.floor(i / 10) * 7) % 360;
+  const sat = 75 - (i % 2) * 30;
+  const light = 50 + (i % 2) * 20;
+  return hslToHex(hue, sat, light);
 }
 
 /* ============================================================
-   EXTRACCIÓN DE GEOMETRÍA + TEXTOS DESDE DXF
+   PARSER DXF — Tabla LAYER
+============================================================ */
+function parseLayersTable(dxfText) {
+  const result = new Map();
+  const lines = dxfText.split(/\r?\n/);
+  let i = 0;
+  let inTables = false, inLayerTable = false;
+  let cur = null;
+
+  while (i < lines.length - 1) {
+    const code = lines[i].trim();
+    const value = lines[i + 1].trim();
+
+    if (code === '0' && value === 'SECTION') {
+      const n2 = lines[i + 2]?.trim();
+      const n3 = lines[i + 3]?.trim();
+      if (n2 === '2' && n3 === 'TABLES') inTables = true;
+    }
+    if (code === '0' && value === 'ENDSEC') {
+      if (cur) { result.set(cur.name, cur); cur = null; }
+      inTables = false;
+      inLayerTable = false;
+    }
+    if (inTables && code === '0' && value === 'TABLE') {
+      const t2 = lines[i + 2]?.trim();
+      const t3 = lines[i + 3]?.trim();
+      inLayerTable = (t2 === '2' && t3 === 'LAYER');
+    }
+    if (inTables && code === '0' && value === 'ENDTAB') {
+      if (cur) { result.set(cur.name, cur); cur = null; }
+      inLayerTable = false;
+    }
+    if (inLayerTable && code === '0' && value === 'LAYER') {
+      if (cur) result.set(cur.name, cur);
+      cur = { name: '', aci: 7, lineweight: -3 };
+    }
+    if (inLayerTable && cur) {
+      if (code === '2') cur.name = value;
+      else if (code === '62') {
+        const aci = parseInt(value, 10);
+        if (!isNaN(aci)) cur.aci = Math.abs(aci);
+      } else if (code === '370') {
+        const lw = parseInt(value, 10);
+        if (!isNaN(lw)) cur.lineweight = lw;
+      }
+    }
+    i += 2;
+  }
+  if (cur) result.set(cur.name, cur);
+  return result;
+}
+
+/* ============================================================
+   PARSER DXF — ENTITIES
 ============================================================ */
 function cleanMText(s) {
   if (!s) return '';
-  return s
-    .replace(/\\P/gi, ' ')              // salto de párrafo
-    .replace(/\\~/g, ' ')               // espacio duro
-    .replace(/\\[A-Za-z][^;]*;/g, '')   // \fArial; \H2.5x; \C1; etc.
-    .replace(/[{}]/g, '')               // llaves de agrupación
-    .replace(/\\\\/g, '\\')             // backslash escapado
-    .replace(/\s+/g, ' ')
-    .trim();
+  return s.replace(/\\P/gi, ' ')
+          .replace(/\\~/g, ' ')
+          .replace(/\\[A-Za-z][^;]*;/g, '')
+          .replace(/[{}]/g, '')
+          .replace(/\\\\/g, '\\')
+          .replace(/\s+/g, ' ')
+          .trim();
 }
 
-function buildMeasureGeometry(dxfText) {
-  const result = { snapPoints: [], segments: [], texts: [] };
-  const seen = new Set();
-  const addSnap = (x, y, type) => {
-    if (!isFinite(x) || !isFinite(y)) return;
-    const key = `${Math.round(x * 1000)}_${Math.round(y * 1000)}_${type}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    result.snapPoints.push({ x, y, type });
-  };
-  const addSeg = (x1, y1, x2, y2) => {
-    if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) result.segments.push({ x1, y1, x2, y2 });
-  };
-  const addText = (x, y, height, rotation, text) => {
-    if (!isFinite(x) || !isFinite(y) || !text) return;
-    result.texts.push({
-      x, y,
-      height: isFinite(height) && height > 0 ? height : 2.5,
-      rotation: isFinite(rotation) ? rotation : 0,
-      text
-    });
-  };
-
+function parseEntities(dxfText, defaultLayer) {
   const lines = dxfText.split(/\r?\n/);
-  let i = 0, inEntities = false;
+  let i = 0;
+  let inEntities = false;
+
   for (i = 0; i < lines.length; i++) {
-    const code = lines[i].trim();
-    const value = lines[i + 1] ? lines[i + 1].trim() : '';
-    if (code === '0' && value === 'SECTION') {
-      const sectionName = lines[i + 3] ? lines[i + 3].trim() : '';
-      if (sectionName === 'ENTITIES') { inEntities = true; i += 4; break; }
+    if (lines[i].trim() === '0' && lines[i + 1]?.trim() === 'SECTION') {
+      const n2 = lines[i + 2]?.trim();
+      const n3 = lines[i + 3]?.trim();
+      if (n2 === '2' && n3 === 'ENTITIES') {
+        inEntities = true;
+        i += 4;
+        break;
+      }
     }
   }
-  if (!inEntities) return result;
+
+  const segments = [];
+  const texts = [];
+  const snapPoints = [];
+  const seenSnap = new Set();
+
+  const addSeg = (x1, y1, x2, y2, layerName) => {
+    if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) {
+      segments.push({ x1, y1, x2, y2, layerName: layerName || defaultLayer || '0' });
+    }
+  };
+  const addSnap = (x, y, type) => {
+    if (!isFinite(x) || !isFinite(y)) return;
+    const k = `${Math.round(x * 1000)}_${Math.round(y * 1000)}_${type}`;
+    if (seenSnap.has(k)) return;
+    seenSnap.add(k);
+    snapPoints.push({ x, y, type });
+  };
+
+  if (!inEntities) return { segments, texts, snapPoints };
 
   let cur = null;
-  let lwVerts = null, lwClosed = false, lwPendingX = null;
-  let inClassicPoly = false, classicVerts = null;
+  let curLayer = defaultLayer || '0';
+  let textChunks = [];
 
-  const flushPolyVerts = (verts, closed) => {
+  let lwVerts = null, lwClosed = false, lwPendingX = null;
+  let inClassicPoly = false, classicVerts = null, classicClosed = false;
+
+  const flushPoly = (verts, closed, layer) => {
     const n = verts.length;
-    if (n === 0) return;
+    if (n < 2) return;
     for (let k = 0; k < n - 1; k++) {
       const a = verts[k], b = verts[k + 1];
+      addSeg(a.x, a.y, b.x, b.y, layer);
       addSnap(a.x, a.y, 'endpoint');
-      addSeg(a.x, a.y, b.x, b.y);
       addSnap((a.x + b.x) / 2, (a.y + b.y) / 2, 'midpoint');
     }
     addSnap(verts[n - 1].x, verts[n - 1].y, 'endpoint');
     if (closed && n > 2) {
-      const a = verts[n - 1], b = verts[0];
-      addSeg(a.x, a.y, b.x, b.y);
-      addSnap((a.x + b.x) / 2, (a.y + b.y) / 2, 'midpoint');
+      addSeg(verts[n - 1].x, verts[n - 1].y, verts[0].x, verts[0].y, layer);
     }
   };
 
-  const flushSimple = () => {
+  const flushCur = () => {
     if (!cur) return;
-    const v = cur.values, t = cur.type;
-    const textChunks = cur.textChunks || [];
+    const v = cur.values || {};
+    const layer = cur.layer || defaultLayer || '0';
 
-    if (t === 'LINE') {
-      const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
-      const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
-      addSnap(x1, y1, 'endpoint'); addSnap(x2, y2, 'endpoint');
-      if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) {
-        addSeg(x1, y1, x2, y2);
+    switch (cur.type) {
+      case 'LINE': {
+        const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
+        const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
+        addSeg(x1, y1, x2, y2, layer);
+        addSnap(x1, y1, 'endpoint');
+        addSnap(x2, y2, 'endpoint');
         addSnap((x1 + x2) / 2, (y1 + y2) / 2, 'midpoint');
+        break;
       }
-    } else if (t === 'CIRCLE') {
-      const cx = parseFloat(v['10']), cy = parseFloat(v['20']), r = parseFloat(v['40']);
-      if (isFinite(cx) && isFinite(cy)) {
-        addSnap(cx, cy, 'center');
-        if (isFinite(r)) {
-          addSnap(cx + r, cy, 'quadrant'); addSnap(cx - r, cy, 'quadrant');
-          addSnap(cx, cy + r, 'quadrant'); addSnap(cx, cy - r, 'quadrant');
-          const N = 48;
+      case 'CIRCLE': {
+        const cx = parseFloat(v['10']), cy = parseFloat(v['20']), r = parseFloat(v['40']);
+        if (isFinite(cx) && isFinite(cy) && isFinite(r) && r > 0) {
+          addSnap(cx, cy, 'center');
+          addSnap(cx + r, cy, 'quadrant');
+          addSnap(cx - r, cy, 'quadrant');
+          addSnap(cx, cy + r, 'quadrant');
+          addSnap(cx, cy - r, 'quadrant');
+          const N = 64;
           for (let k = 0; k < N; k++) {
-            const a1 = (k / N) * Math.PI * 2, a2 = ((k + 1) / N) * Math.PI * 2;
-            addSeg(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2));
+            const a1 = (k / N) * Math.PI * 2;
+            const a2 = ((k + 1) / N) * Math.PI * 2;
+            addSeg(cx + r * Math.cos(a1), cy + r * Math.sin(a1),
+                   cx + r * Math.cos(a2), cy + r * Math.sin(a2), layer);
           }
         }
+        break;
       }
-    } else if (t === 'ARC') {
-      const cx = parseFloat(v['10']), cy = parseFloat(v['20']), r = parseFloat(v['40']);
-      const sa = parseFloat(v['50'] || '0'), ea = parseFloat(v['51'] || '360');
-      if (isFinite(cx) && isFinite(cy)) {
-        addSnap(cx, cy, 'center');
-        if (isFinite(r)) {
-          const a1 = sa * Math.PI / 180, a2 = ea * Math.PI / 180;
-          const sx = cx + r * Math.cos(a1), sy = cy + r * Math.sin(a1);
-          const ex = cx + r * Math.cos(a2), ey = cy + r * Math.sin(a2);
-          addSnap(sx, sy, 'endpoint'); addSnap(ex, ey, 'endpoint');
-          const am = (a1 + a2) / 2;
-          addSnap(cx + r * Math.cos(am), cy + r * Math.sin(am), 'midpoint');
-          const N = 24;
+      case 'ARC': {
+        const cx = parseFloat(v['10']), cy = parseFloat(v['20']), r = parseFloat(v['40']);
+        const sa = parseFloat(v['50'] || '0'), ea = parseFloat(v['51'] || '360');
+        if (isFinite(cx) && isFinite(cy) && isFinite(r) && r > 0) {
+          let a1 = sa * Math.PI / 180;
+          let a2 = ea * Math.PI / 180;
+          if (a2 < a1) a2 += Math.PI * 2;
+          addSnap(cx + r * Math.cos(a1), cy + r * Math.sin(a1), 'endpoint');
+          addSnap(cx + r * Math.cos(a2), cy + r * Math.sin(a2), 'endpoint');
+          const N = 32;
           for (let k = 0; k < N; k++) {
-            const t1 = a1 + (k / N) * (a2 - a1), t2 = a1 + ((k + 1) / N) * (a2 - a1);
-            addSeg(cx + r * Math.cos(t1), cy + r * Math.sin(t1), cx + r * Math.cos(t2), cy + r * Math.sin(t2));
+            const t1 = a1 + (k / N) * (a2 - a1);
+            const t2 = a1 + ((k + 1) / N) * (a2 - a1);
+            addSeg(cx + r * Math.cos(t1), cy + r * Math.sin(t1),
+                   cx + r * Math.cos(t2), cy + r * Math.sin(t2), layer);
           }
         }
+        break;
       }
-    } else if (t === 'POINT') {
-      const x = parseFloat(v['10']), y = parseFloat(v['20']);
-      addSnap(x, y, 'endpoint');
-    } else if (t === 'TEXT') {
-      const x = parseFloat(v['10']), y = parseFloat(v['20']);
-      const h = parseFloat(v['40']);
-      const rot = parseFloat(v['50']);
-      const raw = textChunks.join('').trim();
-      addText(x, y, h, rot, raw);
-    } else if (t === 'MTEXT') {
-      const x = parseFloat(v['10']), y = parseFloat(v['20']);
-      const h = parseFloat(v['40']);
-      const rot = parseFloat(v['50']);
-      const raw = textChunks.join('');
-      const clean = cleanMText(raw);
-      addText(x, y, h, rot, clean);
-    } else if (t === 'POLYLINE_HDR') {
-      lwClosed = (parseInt(v['70'] || '0', 10) & 1) === 1;
-    } else if (t === 'VERTEX' && classicVerts) {
-      const x = parseFloat(v['10']), y = parseFloat(v['20']);
-      if (isFinite(x) && isFinite(y)) classicVerts.push({ x, y });
+      case 'POINT': {
+        const x = parseFloat(v['10']), y = parseFloat(v['20']);
+        addSnap(x, y, 'endpoint');
+        break;
+      }
+      case 'TEXT': {
+        const x = parseFloat(v['10']), y = parseFloat(v['20']);
+        const h = parseFloat(v['40']);
+        const rot = parseFloat(v['50']);
+        const text = (textChunks.join('') || v['1'] || '').trim();
+        if (text) texts.push({ x, y, height: isFinite(h) ? h : 2.5, rotation: isFinite(rot) ? rot : 0, text });
+        break;
+      }
+      case 'MTEXT': {
+        const x = parseFloat(v['10']), y = parseFloat(v['20']);
+        const h = parseFloat(v['40']);
+        const rot = parseFloat(v['50']);
+        const raw = textChunks.join('');
+        const text = cleanMText(raw);
+        if (text) texts.push({ x, y, height: isFinite(h) ? h : 2.5, rotation: isFinite(rot) ? rot : 0, text });
+        break;
+      }
     }
     cur = null;
+    textChunks = [];
   };
 
   for (; i < lines.length - 1; i += 2) {
-    const code = lines[i].trim(), value = lines[i + 1].trim();
+    const code = lines[i].trim();
+    const value = lines[i + 1].trim();
+
     if (code === '0') {
-      if (lwVerts) { flushPolyVerts(lwVerts, lwClosed); lwVerts = null; lwClosed = false; lwPendingX = null; }
-      if (cur) flushSimple();
+      if (lwVerts) { flushPoly(lwVerts, lwClosed, defaultLayer); lwVerts = null; lwClosed = false; lwPendingX = null; }
+      if (cur) flushCur();
+
       if (value === 'ENDSEC') {
-        if (classicVerts) { flushPolyVerts(classicVerts, lwClosed); classicVerts = null; }
+        if (classicVerts) { flushPoly(classicVerts, classicClosed, defaultLayer); classicVerts = null; }
         break;
       }
-      if (value === 'LWPOLYLINE') { lwVerts = []; lwClosed = false; lwPendingX = null; continue; }
-      if (value === 'POLYLINE') { inClassicPoly = true; classicVerts = []; lwClosed = false; cur = { type: 'POLYLINE_HDR', values: {} }; continue; }
-      if (value === 'VERTEX' && inClassicPoly) { cur = { type: 'VERTEX', values: {} }; continue; }
+      if (value === 'LWPOLYLINE') { lwVerts = []; lwClosed = false; lwPendingX = null; cur = { type: 'LWPOLYLINE', values: {}, layer: defaultLayer }; continue; }
+      if (value === 'POLYLINE') { inClassicPoly = true; classicVerts = []; classicClosed = false; cur = { type: 'POLYLINE_HDR', values: {}, layer: defaultLayer }; continue; }
+      if (value === 'VERTEX' && inClassicPoly) { cur = { type: 'VERTEX', values: {}, layer: defaultLayer }; continue; }
       if (value === 'SEQEND') {
         inClassicPoly = false;
-        if (classicVerts) { flushPolyVerts(classicVerts, lwClosed); classicVerts = null; }
+        if (classicVerts) { flushPoly(classicVerts, classicClosed, defaultLayer); classicVerts = null; }
         continue;
       }
-      cur = { type: value, values: {} };
+      cur = { type: value, values: {}, layer: defaultLayer };
+      textChunks = [];
       continue;
     }
+
     if (lwVerts !== null) {
-      if (code === '70') lwClosed = (parseInt(value, 10) & 1) === 1;
+      if (code === '8') cur.layer = value;
+      else if (code === '70') lwClosed = (parseInt(value, 10) & 1) === 1;
       else if (code === '10') lwPendingX = parseFloat(value);
       else if (code === '20') {
         const y = parseFloat(value);
@@ -1461,221 +1167,573 @@ function buildMeasureGeometry(dxfText) {
       }
       continue;
     }
-    if (cur) {
-      // Recolectar fragmentos de texto (TEXT: sólo código 1; MTEXT: códigos 1 y 3)
-      if (code === '1' || code === '3') {
-        if (!cur.textChunks) cur.textChunks = [];
-        cur.textChunks.push(value);
-      } else {
-        cur.values[code] = value;
+
+    if (!cur) continue;
+
+    if (code === '8') { cur.layer = value; continue; }
+
+    if (cur.type === 'POLYLINE_HDR' && code === '70') {
+      classicClosed = (parseInt(value, 10) & 1) === 1;
+      continue;
+    }
+    if (cur.type === 'VERTEX' && code === '10') { cur.values.x = parseFloat(value); continue; }
+    if (cur.type === 'VERTEX' && code === '20') {
+      const x = cur.values.x;
+      const y = parseFloat(value);
+      if (isFinite(x) && isFinite(y) && classicVerts) classicVerts.push({ x, y });
+      continue;
+    }
+
+    if (code === '1' || code === '3') {
+      if (cur.type === 'TEXT' || cur.type === 'MTEXT') {
+        textChunks.push(value);
+        continue;
       }
     }
+    cur.values[code] = value;
   }
-  return result;
-}
 
-function pixelsToWorldUnits(px, clientX, clientY) {
-  const p0 = projectScreenToWorld(clientX, clientY);
-  const p1 = projectScreenToWorld(clientX + 10, clientY);
-  if (!p0 || !p1) return px;
-  const upp = Math.hypot(p1.x - p0.x, p1.y - p0.y) / 10;
-  return px * (upp || 0.001);
-}
-function pointToSegDistWorld(px, py, seg) {
-  const dx = seg.x2 - seg.x1, dy = seg.y2 - seg.y1;
-  const lenSq = dx * dx + dy * dy;
-  let t = lenSq > 1e-12 ? ((px - seg.x1) * dx + (py - seg.y1) * dy) / lenSq : 0;
-  t = Math.max(0, Math.min(1, t));
-  const cx = seg.x1 + t * dx, cy = seg.y1 + t * dy;
-  return Math.hypot(px - cx, py - cy);
-}
-function pointToInfiniteLineDist(px, py, seg) {
-  const dx = seg.x2 - seg.x1, dy = seg.y2 - seg.y1;
-  const len = Math.hypot(dx, dy);
-  if (len < 1e-9) return Math.hypot(px - seg.x1, py - seg.y1);
-  return Math.abs((px - seg.x1) * dy - (py - seg.y1) * dx) / len;
-}
+  if (cur) flushCur();
+  if (lwVerts) flushPoly(lwVerts, lwClosed, defaultLayer);
+  if (classicVerts) flushPoly(classicVerts, classicClosed, defaultLayer);
 
-function findSnapPoint(clientX, clientY, threshold = 14) {
-  if (!viewer) return null;
-  const camera = viewer.GetCamera();
-  const canvas = viewer.GetCanvas();
-  if (!camera || !canvas) return null;
-  const rect = canvas.getBoundingClientRect();
-  const clickX = clientX - rect.left;
-  const clickY = clientY - rect.top;
-  const thresh2 = threshold * threshold;
-
-  // 1) Snaps geométricos exactos
-  let best = null, bestDist2 = thresh2;
-  for (const pt of snapPoints) {
-    let tipoActivo = false;
-    switch (pt.type) {
-      case 'endpoint': tipoActivo = measureSnaps.has('endpoint'); break;
-      case 'midpoint': tipoActivo = measureSnaps.has('midpoint'); break;
-      case 'center': tipoActivo = measureSnaps.has('center'); break;
-      case 'quadrant': tipoActivo = measureSnaps.has('quadrant'); break;
-    }
-    if (!tipoActivo) continue;
-    const sp = projectWorldToScreen(pt.x, pt.y, camera, rect);
-    const dx = sp.x - clickX, dy = sp.y - clickY;
-    const d2 = dx * dx + dy * dy;
-    if (d2 < bestDist2) {
-      bestDist2 = d2;
-      best = { x: pt.x, y: pt.y, z: 0, screenX: sp.x, screenY: sp.y, type: pt.type };
-    }
-  }
-  if (best) return best;
-
-  // 2) Perpendicular
-  if (measureSnaps.has('perpendicular')) {
-    const pp = findPerpendicularSnap(clientX, clientY, threshold);
-    if (pp) return pp;
-  }
-  // 3) Intersección
-  if (measureSnaps.has('intersection')) {
-    const ix = findIntersectionNear(clientX, clientY, threshold);
-    if (ix) return ix;
-  }
-  // 4) Intersección ficticia (extensión)
-  if (measureSnaps.has('fictitious')) {
-    const fx = findFictitiousIntersection(clientX, clientY, threshold);
-    if (fx) return fx;
-  }
-  // 5) Cercano (sobre segmento)
-  if (measureSnaps.has('nearest')) {
-    const nr = findNearestOnSegments(clientX, clientY, threshold);
-    if (nr) return nr;
-  }
-  return null;
-}
-
-function findNearestOnSegments(clientX, clientY, threshold) {
-  if (!viewer || lineSegments.length === 0) return null;
-  const camera = viewer.GetCamera(), canvas = viewer.GetCanvas();
-  if (!camera || !canvas) return null;
-  const rect = canvas.getBoundingClientRect();
-  const clickX = clientX - rect.left, clickY = clientY - rect.top;
-  let best = null, bestDist2 = threshold * threshold;
-  for (const seg of lineSegments) {
-    const p1 = projectWorldToScreen(seg.x1, seg.y1, camera, rect);
-    const p2 = projectWorldToScreen(seg.x2, seg.y2, camera, rect);
-    const dx = p2.x - p1.x, dy = p2.y - p1.y;
-    const lenSq = dx * dx + dy * dy;
-    let t = lenSq > 1e-9 ? ((clickX - p1.x) * dx + (clickY - p1.y) * dy) / lenSq : 0;
-    t = Math.max(0, Math.min(1, t));
-    const sx = p1.x + t * dx, sy = p1.y + t * dy;
-    const d2 = (clickX - sx) ** 2 + (clickY - sy) ** 2;
-    if (d2 < bestDist2) {
-      bestDist2 = d2;
-      best = { x: seg.x1 + t * (seg.x2 - seg.x1), y: seg.y1 + t * (seg.y2 - seg.y1), z: 0, screenX: sx, screenY: sy, type: 'nearest' };
-    }
-  }
-  return best;
-}
-
-function findPerpendicularSnap(clientX, clientY, threshold) {
-  if (!viewer || lineSegments.length === 0 || measurePoints.length === 0) return null;
-  const ref = measurePoints[measurePoints.length - 1];
-  const camera = viewer.GetCamera(), canvas = viewer.GetCanvas();
-  if (!camera || !canvas) return null;
-  const rect = canvas.getBoundingClientRect();
-  const clickX = clientX - rect.left, clickY = clientY - rect.top;
-  let best = null, bestDist2 = threshold * threshold;
-  const margin = 0.05;
-  for (const seg of lineSegments) {
-    const dx = seg.x2 - seg.x1, dy = seg.y2 - seg.y1;
-    const lenSq = dx * dx + dy * dy;
-    if (lenSq < 1e-12) continue;
-    const t = ((ref.x - seg.x1) * dx + (ref.y - seg.y1) * dy) / lenSq;
-    if (t < -margin || t > 1 + margin) continue;
-    const fx = seg.x1 + t * dx, fy = seg.y1 + t * dy;
-    const sp = projectWorldToScreen(fx, fy, camera, rect);
-    const d2 = (sp.x - clickX) ** 2 + (sp.y - clickY) ** 2;
-    if (d2 < bestDist2) { bestDist2 = d2; best = { x: fx, y: fy, z: 0, screenX: sp.x, screenY: sp.y, type: 'perpendicular' }; }
-  }
-  return best;
-}
-
-function findIntersectionNear(clientX, clientY, threshold) {
-  if (!viewer || lineSegments.length < 2) return null;
-  const camera = viewer.GetCamera(), canvas = viewer.GetCanvas();
-  if (!camera || !canvas) return null;
-  const rect = canvas.getBoundingClientRect();
-  const clickX = clientX - rect.left, clickY = clientY - rect.top;
-  const cursorWorld = projectScreenToWorld(clientX, clientY);
-  if (!cursorWorld) return null;
-
-  const worldRadius = pixelsToWorldUnits(threshold * 4, clientX, clientY);
-  const candidates = [];
-  for (const seg of lineSegments) {
-    if (pointToSegDistWorld(cursorWorld.x, cursorWorld.y, seg) <= worldRadius) candidates.push(seg);
-  }
-  if (candidates.length < 2) return null;
-  let best = null, bestDist2 = threshold * threshold;
-  for (let a = 0; a < candidates.length; a++) {
-    for (let b = a + 1; b < candidates.length; b++) {
-      const sA = candidates[a], sB = candidates[b];
-      const ix = segIntersectWorld({ x: sA.x1, y: sA.y1 }, { x: sA.x2, y: sA.y2 }, { x: sB.x1, y: sB.y1 }, { x: sB.x2, y: sB.y2 });
-      if (!ix) continue;
-      const sp = projectWorldToScreen(ix.x, ix.y, camera, rect);
-      const d2 = (sp.x - clickX) ** 2 + (sp.y - clickY) ** 2;
-      if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: sp.x, screenY: sp.y, type: 'intersection' }; }
-    }
-  }
-  return best;
-}
-
-function findFictitiousIntersection(clientX, clientY, threshold) {
-  if (!viewer || lineSegments.length < 2) return null;
-  const camera = viewer.GetCamera(), canvas = viewer.GetCanvas();
-  if (!camera || !canvas) return null;
-  const rect = canvas.getBoundingClientRect();
-  const clickX = clientX - rect.left, clickY = clientY - rect.top;
-  const cursorWorld = projectScreenToWorld(clientX, clientY);
-  if (!cursorWorld) return null;
-
-  const worldRadius = pixelsToWorldUnits(threshold * 6, clientX, clientY);
-  const candidates = [];
-  for (const seg of lineSegments) {
-    if (pointToInfiniteLineDist(cursorWorld.x, cursorWorld.y, seg) <= worldRadius) candidates.push(seg);
-  }
-  if (candidates.length < 2) return null;
-  let best = null, bestDist2 = threshold * threshold;
-  const margin = 2.0;
-  for (let a = 0; a < candidates.length; a++) {
-    for (let b = a + 1; b < candidates.length; b++) {
-      const sA = candidates[a], sB = candidates[b];
-      const d1x = sA.x2 - sA.x1, d1y = sA.y2 - sA.y1;
-      const d2x = sB.x2 - sB.x1, d2y = sB.y2 - sB.y1;
-      const denom = d1x * d2y - d1y * d2x;
-      if (Math.abs(denom) < 1e-12) continue;
-      const t = ((sB.x1 - sA.x1) * d2y - (sB.y1 - sA.y1) * d2x) / denom;
-      const u = ((sB.x1 - sA.x1) * d1y - (sB.y1 - sA.y1) * d1x) / denom;
-      if (t < -margin || t > 1 + margin || u < -margin || u > 1 + margin) continue;
-      const ix = { x: sA.x1 + t * d1x, y: sA.y1 + t * d1y };
-      const sp = projectWorldToScreen(ix.x, ix.y, camera, rect);
-      const d2 = (sp.x - clickX) ** 2 + (sp.y - clickY) ** 2;
-      if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: sp.x, screenY: sp.y, type: 'fictitious' }; }
-    }
-  }
-  return best;
-}
-
-function segIntersectWorld(a1, a2, b1, b2) {
-  const d1x = a2.x - a1.x, d1y = a2.y - a1.y;
-  const d2x = b2.x - b1.x, d2y = b2.y - b1.y;
-  const denom = d1x * d2y - d1y * d2x;
-  if (Math.abs(denom) < 1e-12) return null;
-  const t = ((b1.x - a1.x) * d2y - (b1.y - a1.y) * d2x) / denom;
-  const u = ((b1.x - a1.x) * d1y - (b1.y - a1.y) * d1x) / denom;
-  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
-  return { x: a1.x + t * d1x, y: a1.y + t * d1y };
+  return { segments, texts, snapPoints };
 }
 
 /* ============================================================
-   OVERLAY DE MEDICIÓN & HISTORIAL
+   BOUNDS
 ============================================================ */
+function computeBounds(segments, texts) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const s of segments) {
+    if (s.x1 < minX) minX = s.x1;
+    if (s.x1 > maxX) maxX = s.x1;
+    if (s.y1 < minY) minY = s.y1;
+    if (s.y1 > maxY) maxY = s.y1;
+    if (s.x2 < minX) minX = s.x2;
+    if (s.x2 > maxX) maxX = s.x2;
+    if (s.y2 < minY) minY = s.y2;
+    if (s.y2 > maxY) maxY = s.y2;
+  }
+  for (const t of texts) {
+    const w = t.text.length * t.height * 0.6;
+    if (t.x < minX) minX = t.x;
+    if (t.x + w > maxX) maxX = t.x + w;
+    if (t.y < minY) minY = t.y;
+    if (t.y + t.height > maxY) maxY = t.y + t.height;
+  }
+  if (!isFinite(minX)) return null;
+  return { minX, minY, maxX, maxY };
+}
+
+/* ============================================================
+   THREE — Init
+============================================================ */
+function initThree() {
+  if (renderer) return;
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x0d1117, 1);
+  renderer.domElement.style.display = 'block';
+  renderer.domElement.style.width = '100%';
+  renderer.domElement.style.height = '100%';
+  DOM.viewerContainer.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+
+  camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+  camera.position.set(0, 0, 100);
+  camera.lookAt(0, 0, 0);
+
+  gridHelper = new THREE.GridHelper(200, 200, 0x2e2e2e, 0x1b1b1b);
+  gridHelper.rotation.x = Math.PI / 2;
+  gridHelper.position.z = -10;
+  gridHelper.material.depthWrite = false;
+  gridHelper.material.opacity = 0.35;
+  gridHelper.material.transparent = true;
+  scene.add(gridHelper);
+
+  resizeRenderer();
+  render();
+}
+
+function resizeRenderer() {
+  if (!renderer) return;
+  const w = DOM.viewerContainer.clientWidth;
+  const h = DOM.viewerContainer.clientHeight;
+  if (w === 0 || h === 0) return;
+  renderer.setSize(w, h, false);
+  updateCamera();
+  updateMaterialResolutions();
+}
+
+function updateCamera() {
+  if (!camera || !renderer) return;
+  const w = DOM.viewerContainer.clientWidth;
+  const h = DOM.viewerContainer.clientHeight;
+  const halfW = w / 2 * state.view.scale;
+  const halfH = h / 2 * state.view.scale;
+  camera.left = state.view.x - halfW;
+  camera.right = state.view.x + halfW;
+  camera.top = state.view.y + halfH;
+  camera.bottom = state.view.y - halfH;
+  camera.updateProjectionMatrix();
+}
+
+function updateMaterialResolutions() {
+  const w = DOM.viewerContainer.clientWidth;
+  const h = DOM.viewerContainer.clientHeight;
+  if (w === 0 || h === 0) return;
+  for (const mat of lineMaterials) {
+    mat.resolution.set(w, h);
+    mat.needsUpdate = true;
+  }
+}
+
+function render() {
+  if (!renderer || !scene || !camera) return;
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   LINEWEIGHT → PX
+============================================================ */
+function lwToPx(lwRaw, globalScale) {
+  let mm;
+  if (lwRaw === 0) mm = 0.13;
+  else if (lwRaw > 0) mm = lwRaw / 100;
+  else mm = 0.25;
+  const px = mm * 4;
+  return Math.max(1, Math.min(24, px * globalScale));
+}
+
+/* ============================================================
+   ESCENA
+============================================================ */
+function buildSceneFromSegments() {
+  if (!scene) return;
+
+  for (const [name, obj] of layerObjects) {
+    try {
+      scene.remove(obj);
+      obj.geometry.dispose();
+      obj.material.dispose();
+    } catch (e) {}
+  }
+  layerObjects.clear();
+  lineMaterials.length = 0;
+
+  if (state.segments.length === 0) return;
+
+  const byLayer = new Map();
+  for (const s of state.segments) {
+    const lname = s.layerName;
+    let arr = byLayer.get(lname);
+    if (!arr) { arr = []; byLayer.set(lname, arr); }
+    arr.push(s);
+  }
+
+  const cw = DOM.viewerContainer.clientWidth || 800;
+  const ch = DOM.viewerContainer.clientHeight || 600;
+
+  for (const [layerName, segs] of byLayer) {
+    const positions = new Float32Array(segs.length * 6);
+    let p = 0;
+    for (const s of segs) {
+      positions[p++] = s.x1;
+      positions[p++] = s.y1;
+      positions[p++] = 0;
+      positions[p++] = s.x2;
+      positions[p++] = s.y2;
+      positions[p++] = 0;
+    }
+
+    const geom = new LineSegmentsGeometry();
+    geom.setPositions(positions);
+
+    const layerInfo = state.layers.get(layerName);
+    const colorHex = layerInfo?.color || '#ffffff';
+    const lineweight = layerInfo?.lineweight ?? -3;
+
+    const mat = new LineMaterial({
+      color: new THREE.Color(colorHex),
+      linewidth: lwToPx(lineweight, state.widthScale),
+      worldUnits: false,
+      alphaToCoverage: true,
+      dashed: false,
+    });
+    mat.resolution.set(cw, ch);
+
+    const obj = new LineSegments2(geom, mat);
+    obj.computeLineDistances();
+    obj.userData.layerName = layerName;
+    obj.userData.lineweightRaw = lineweight;
+
+    if (layerInfo && layerInfo.visible === false) obj.visible = false;
+
+    scene.add(obj);
+    layerObjects.set(layerName, obj);
+    lineMaterials.push(mat);
+  }
+
+  if (gridHelper) gridHelper.visible = state.segments.length > 0;
+}
+
+function applyWidthScale() {
+  for (const obj of layerObjects.values()) {
+    const lwRaw = obj.userData.lineweightRaw ?? -3;
+    const mat = obj.material;
+    if (mat) {
+      mat.linewidth = lwToPx(lwRaw, state.widthScale);
+      mat.needsUpdate = true;
+    }
+  }
+  render();
+}
+
+function setLayerVisible(layerName, visible) {
+  const info = state.layers.get(layerName);
+  if (info) info.visible = visible;
+  const obj = layerObjects.get(layerName);
+  if (obj) obj.visible = visible;
+  render();
+}
+
+/* ============================================================
+   COORDENADAS
+============================================================ */
+function screenToWorld(clientX, clientY) {
+  const rect = DOM.viewerContainer.getBoundingClientRect();
+  const sx = clientX - rect.left;
+  const sy = clientY - rect.top;
+  const w = rect.width, h = rect.height;
+  const dx = (sx - w / 2) * state.view.scale;
+  const dy = (h / 2 - sy) * state.view.scale;
+  return { x: state.view.x + dx, y: state.view.y + dy };
+}
+
+function worldToScreen(x, y) {
+  const rect = DOM.viewerContainer.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  const sx = w / 2 + (x - state.view.x) / state.view.scale;
+  const sy = h / 2 - (y - state.view.y) / state.view.scale;
+  return { x: sx, y: sy };
+}
+
+function fitView() {
+  if (!state.bounds) return;
+  const w = DOM.viewerContainer.clientWidth;
+  const h = DOM.viewerContainer.clientHeight;
+  if (w === 0 || h === 0) return;
+
+  const { minX, minY, maxX, maxY } = state.bounds;
+  const bw = Math.max(0.001, maxX - minX);
+  const bh = Math.max(0.001, maxY - minY);
+  const margin = 1.1;
+
+  state.view.scale = Math.max(bw / w, bh / h) * margin;
+  state.view.x = (minX + maxX) / 2;
+  state.view.y = (minY + maxY) / 2;
+
+  updateCamera();
+  render();
+  drawMeasurePreview();
+}
+
+function zoomAtScreenPoint(factor, clientX, clientY) {
+  const rect = DOM.viewerContainer.getBoundingClientRect();
+  const sx = clientX - rect.left - rect.width / 2;
+  const sy = -(clientY - rect.top - rect.height / 2);
+
+  const worldX = state.view.x + sx * state.view.scale;
+  const worldY = state.view.y + sy * state.view.scale;
+
+  state.view.scale = Math.max(1e-6, Math.min(1e6, state.view.scale * factor));
+
+  state.view.x = worldX - sx * state.view.scale;
+  state.view.y = worldY - sy * state.view.scale;
+
+  updateCamera();
+  render();
+  drawMeasurePreview();
+}
+
+function zoomIn() {
+  const rect = DOM.viewerContainer.getBoundingClientRect();
+  zoomAtScreenPoint(0.8, rect.left + rect.width / 2, rect.top + rect.height / 2);
+}
+function zoomOut() {
+  const rect = DOM.viewerContainer.getBoundingClientRect();
+  zoomAtScreenPoint(1.25, rect.left + rect.width / 2, rect.top + rect.height / 2);
+}
+
+/* ============================================================
+   MOUSE CONTROLS
+============================================================ */
+let panState = null;
+
+function attachMouseControls() {
+  const el = DOM.viewerContainer;
+
+  el.addEventListener('wheel', (e) => {
+    if (!state.bounds) return;
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 1.15 : 0.87;
+    zoomAtScreenPoint(factor, e.clientX, e.clientY);
+  }, { passive: false });
+
+  el.addEventListener('mousedown', (e) => {
+    if (e.pointerType === 'touch') return;
+    if (e.button === 1 || e.button === 2) {
+      panState = { startX: e.clientX, startY: e.clientY, viewX: state.view.x, viewY: state.view.y };
+      e.preventDefault();
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (panState) {
+      const dx = e.clientX - panState.startX;
+      const dy = e.clientY - panState.startY;
+      state.view.x = panState.viewX - dx * state.view.scale;
+      state.view.y = panState.viewY + dy * state.view.scale;
+      updateCamera();
+      render();
+      drawMeasurePreview();
+    }
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (panState && (e.button === 1 || e.button === 2)) {
+      panState = null;
+    }
+  });
+
+  el.addEventListener('contextmenu', (e) => { e.preventDefault(); });
+}
+
+/* ============================================================
+   CONTROL TÁCTIL TIPO TRACKPAD
+============================================================ */
+const touch = {
+  pointers: new Map(),
+  lastPan: null,
+  lastPinchDist: 0,
+  lastPinchCenter: null,
+  tapStartTime: 0,
+  tapStartPos: { x: 0, y: 0 },
+  tapMaxMove: 0,
+  lastTapTime: 0,
+  lastTapPos: { x: 0, y: 0 },
+  longPressTimer: null,
+};
+
+const TAP_MAX_MS = 300;
+const TAP_MAX_MOVE = 10;
+const DOUBLE_TAP_MS = 320;
+
+function attachTouchControls() {
+  const el = DOM.viewerContainer;
+
+  el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
+
+    touch.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (touch.pointers.size === 1) {
+      touch.lastPan = { x: e.clientX, y: e.clientY };
+      touch.tapStartTime = Date.now();
+      touch.tapStartPos = { x: e.clientX, y: e.clientY };
+      touch.tapMaxMove = 0;
+
+      clearTimeout(touch.longPressTimer);
+      touch.longPressTimer = setTimeout(() => {
+        touch.longPressTimer = null;
+      }, 600);
+    } else if (touch.pointers.size === 2) {
+      clearTimeout(touch.longPressTimer);
+      touch.longPressTimer = null;
+      const pts = [...touch.pointers.values()];
+      touch.lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      touch.lastPinchCenter = {
+        x: (pts[0].x + pts[1].x) / 2,
+        y: (pts[0].y + pts[1].y) / 2,
+      };
+      touch.lastPan = null;
+    }
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'touch') return;
+    if (!touch.pointers.has(e.pointerId)) return;
+
+    touch.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (touch.pointers.size === 1 && touch.tapStartTime > 0) {
+      const d = Math.hypot(e.clientX - touch.tapStartPos.x, e.clientY - touch.tapStartPos.y);
+      if (d > touch.tapMaxMove) touch.tapMaxMove = d;
+    }
+
+    if (touch.pointers.size === 1 && touch.lastPan) {
+      const dx = e.clientX - touch.lastPan.x;
+      const dy = e.clientY - touch.lastPan.y;
+      state.view.x -= dx * state.view.scale;
+      state.view.y += dy * state.view.scale;
+      touch.lastPan = { x: e.clientX, y: e.clientY };
+      updateCamera();
+      render();
+      drawMeasurePreview();
+    } else if (touch.pointers.size === 2) {
+      const pts = [...touch.pointers.values()];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const center = {
+        x: (pts[0].x + pts[1].x) / 2,
+        y: (pts[0].y + pts[1].y) / 2,
+      };
+
+      if (touch.lastPinchDist > 1 && dist > 1) {
+        const factor = touch.lastPinchDist / dist;
+        zoomAtScreenPoint(factor, center.x, center.y);
+      }
+
+      if (touch.lastPinchCenter) {
+        const dx = center.x - touch.lastPinchCenter.x;
+        const dy = center.y - touch.lastPinchCenter.y;
+        state.view.x -= dx * state.view.scale;
+        state.view.y += dy * state.view.scale;
+        updateCamera();
+        render();
+        drawMeasurePreview();
+      }
+
+      touch.lastPinchDist = dist;
+      touch.lastPinchCenter = center;
+    }
+  });
+
+  const endPointer = (e) => {
+    if (e.pointerType !== 'touch') return;
+    if (!touch.pointers.has(e.pointerId)) return;
+
+    const wasSingle = touch.pointers.size === 1;
+    touch.pointers.delete(e.pointerId);
+
+    if (wasSingle) {
+      const elapsed = Date.now() - touch.tapStartTime;
+      const moved = touch.tapMaxMove;
+      clearTimeout(touch.longPressTimer);
+      touch.longPressTimer = null;
+
+      if (elapsed < TAP_MAX_MS && moved < TAP_MAX_MOVE) {
+        const now = Date.now();
+        const isDoubleTap = (now - touch.lastTapTime < DOUBLE_TAP_MS) &&
+          Math.hypot(e.clientX - touch.lastTapPos.x, e.clientY - touch.lastTapPos.y) < 30;
+
+        if (isDoubleTap) {
+          handleDoubleTap(e.clientX, e.clientY);
+          touch.lastTapTime = 0;
+        } else {
+          handleSingleTap(e.clientX, e.clientY);
+          touch.lastTapTime = now;
+          touch.lastTapPos = { x: e.clientX, y: e.clientY };
+        }
+      }
+    }
+
+    if (touch.pointers.size === 1) {
+      const rem = [...touch.pointers.values()][0];
+      touch.lastPan = { x: rem.x, y: rem.y };
+      touch.lastPinchDist = 0;
+      touch.lastPinchCenter = null;
+    } else if (touch.pointers.size === 0) {
+      touch.lastPan = null;
+      touch.lastPinchDist = 0;
+      touch.lastPinchCenter = null;
+      touch.tapStartTime = 0;
+      touch.tapMaxMove = 0;
+    }
+  };
+
+  el.addEventListener('pointerup', endPointer);
+  el.addEventListener('pointercancel', endPointer);
+
+  el.addEventListener('gesturestart', (e) => e.preventDefault());
+  el.addEventListener('gesturechange', (e) => e.preventDefault());
+  el.addEventListener('gestureend', (e) => e.preventDefault());
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+}
+
+function handleSingleTap(clientX, clientY) {
+  if (!state.bounds) return;
+
+  if (clickHideMode) {
+    const lname = pickLayerAtPoint(clientX, clientY);
+    if (!lname) { notificar('No se encontró objeto', 'warn'); return; }
+    const info = state.layers.get(lname);
+    if (!info) return;
+    if (info.visible === false) { notificar('Capa ya oculta', 'warn'); return; }
+    info.visible = false;
+    setLayerVisible(lname, false);
+    if (!undoing) {
+      layerHistory.push([{ name: lname, oldVisible: true, newVisible: false }]);
+      if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
+      updateUndoUI();
+    }
+    renderLayers();
+    notificar(`Capa apagada: ${lname}`);
+    return;
+  }
+
+  if (measureMode) {
+    const snap = findSnapPoint(clientX, clientY);
+    let worldPoint;
+    if (snap) worldPoint = { x: snap.x, y: snap.y, z: 0 };
+    else worldPoint = screenToWorld(clientX, clientY);
+
+    measurePoints.push(worldPoint);
+    updateMeasureResult();
+
+    if (measureTool === 'distance' && measurePoints.length === 2) {
+      finishCurrentMeasurement();
+    } else if (measureTool === 'angle' && measurePoints.length === 3) {
+      finishCurrentMeasurement();
+    } else {
+      drawMeasurePreview();
+    }
+    return;
+  }
+}
+
+function handleDoubleTap(clientX, clientY) {
+  if (!measureMode) return;
+  if (measureTool === 'polyline' || measureTool === 'area') {
+    if (measurePoints.length > 2) {
+      const p1 = measurePoints[measurePoints.length - 1];
+      const p2 = measurePoints[measurePoints.length - 2];
+      if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1e-9) measurePoints.pop();
+    }
+    updateMeasureResult();
+    finishCurrentMeasurement();
+  }
+}
+
+/* ============================================================
+   MEDICIÓN
+============================================================ */
+let measureMode = false;
+let measureTool = 'distance';
+let measurePoints = [];
+let measureSnaps = new Set(['endpoint', 'midpoint', 'center', 'quadrant', 'nearest', 'intersection', 'perpendicular', 'fictitious']);
+let lastSnapPoint = null;
+let mouseScreen = { x: 0, y: 0 };
+let measureHistory = [];
+let measureHistorySeq = 0;
+
+const SNAP_LABELS = { endpoint: 'Extremo', midpoint: 'Medio', center: 'Centro', quadrant: 'Cuadrante', nearest: 'Cercano', intersection: 'Intersección', fictitious: 'Extensión', perpendicular: 'Perpendicular' };
+
 function getOverlayCtx() {
   const c = DOM.measureOverlay;
   const rect = DOM.canvasContainer.getBoundingClientRect();
@@ -1694,39 +1752,33 @@ function getOverlayCtx() {
 
 function drawMeasurePreview() {
   const { ctx } = getOverlayCtx();
-  const camera = viewer?.GetCamera();
   const rect = DOM.canvasContainer.getBoundingClientRect();
-  if (!camera) return;
 
-  const proj = (wp) => projectWorldToScreen(wp.x, wp.y, camera, rect);
-
-  // 1. Historial de mediciones confirmadas
   measureHistory.forEach(item => {
     ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(63, 185, 80, 0.85)';
     ctx.fillStyle = 'rgba(63, 185, 80, 0.15)';
     ctx.setLineDash([]);
 
-    const pts = item.points.map(proj);
+    const pts = item.points.map(p => worldToScreen(p.x, p.y));
     if (pts.length === 0) return;
 
     if (item.tool === 'distance' && pts.length === 2) {
       ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(pts[1].x, pts[1].y); ctx.stroke();
     } else if (item.tool === 'polyline' && pts.length >= 2) {
       ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
-      for(let i=1; i<pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
       ctx.stroke();
     } else if (item.tool === 'area' && pts.length >= 3) {
       ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
-      for(let i=1; i<pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
       ctx.closePath(); ctx.fill(); ctx.stroke();
     } else if (item.tool === 'angle' && pts.length === 3) {
       ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(pts[1].x, pts[1].y); ctx.lineTo(pts[2].x, pts[2].y); ctx.stroke();
     }
 
     pts.forEach(p => {
-      if(!p) return;
-      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
       ctx.fillStyle = '#3fb950'; ctx.fill();
       ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke();
     });
@@ -1734,68 +1786,232 @@ function drawMeasurePreview() {
 
   if (!measureMode || measurePoints.length === 0) return;
 
-  // 2. Medición activa
-  const pts = measurePoints;
+  const pts = measurePoints.map(p => worldToScreen(p.x, p.y));
   let curX, curY;
-  if (lastSnapPoint) { curX = lastSnapPoint.screenX; curY = lastSnapPoint.screenY; }
-  else { curX = mouseScreen.x - rect.left; curY = mouseScreen.y - rect.top; }
+  if (lastSnapPoint) {
+    const sp = worldToScreen(lastSnapPoint.x, lastSnapPoint.y);
+    curX = sp.x; curY = sp.y;
+  } else {
+    curX = mouseScreen.x - rect.left;
+    curY = mouseScreen.y - rect.top;
+  }
 
   ctx.lineWidth = 2; ctx.strokeStyle = '#2f81f7'; ctx.fillStyle = 'rgba(47, 129, 247, 0.12)';
   ctx.setLineDash([6, 4]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
-  if (measureTool === 'distance') {
-    const p0 = proj(pts[0]);
-    if (p0) { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(curX, curY); ctx.stroke(); }
+  if (measureTool === 'distance' && pts[0]) {
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(curX, curY); ctx.stroke();
   } else if (measureTool === 'polyline') {
     ctx.beginPath();
-    const p0 = proj(pts[0]);
-    if(p0) ctx.moveTo(p0.x, p0.y);
-    for (let i = 1; i < pts.length; i++) {
-      const p = proj(pts[i]);
-      if(p) ctx.lineTo(p.x, p.y);
-    }
+    if (pts[0]) ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.lineTo(curX, curY); ctx.stroke();
-  } else if (measureTool === 'area') {
-    if (pts.length >= 2) {
-      ctx.beginPath();
-      const p0 = proj(pts[0]);
-      if(p0) ctx.moveTo(p0.x, p0.y);
-      for (let i = 1; i < pts.length; i++) {
-        const p = proj(pts[i]);
-        if(p) ctx.lineTo(p.x, p.y);
-      }
-      ctx.lineTo(curX, curY); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-    }
+  } else if (measureTool === 'area' && pts.length >= 2) {
+    ctx.beginPath();
+    if (pts[0]) ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.lineTo(curX, curY); ctx.closePath();
+    ctx.fill(); ctx.stroke();
   } else if (measureTool === 'angle') {
     if (pts.length === 1) {
-      const p0 = proj(pts[0]);
-      if (p0) { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(curX, curY); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(curX, curY); ctx.stroke();
     } else if (pts.length >= 2) {
-      const p0 = proj(pts[0]), p1 = proj(pts[1]);
-      if (p0 && p1) { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(curX, curY); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(pts[1].x, pts[1].y); ctx.lineTo(curX, curY); ctx.stroke();
     }
   }
 
   ctx.setLineDash([]);
 
-  pts.forEach(wp => {
-    const p = proj(wp);
-    if(p) {
-      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
-      ctx.fillStyle = '#2f81f7'; ctx.fill();
-      ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke();
-    }
+  pts.forEach(p => {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#2f81f7'; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke();
   });
+}
+
+function dist2d(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
+
+function pointSegDist2(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-9) return (px - x1) ** 2 + (py - y1) ** 2;
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * dx, cy = y1 + t * dy;
+  return (px - cx) ** 2 + (py - cy) ** 2;
+}
+
+function findSnapPoint(clientX, clientY, threshold = 14) {
+  const world = screenToWorld(clientX, clientY);
+  const worldR = threshold * state.view.scale;
+  const worldR2 = worldR * worldR;
+
+  let best = null, bestD2 = worldR2;
+
+  for (const pt of state.snapPoints) {
+    let active = false;
+    switch (pt.type) {
+      case 'endpoint': active = measureSnaps.has('endpoint'); break;
+      case 'midpoint': active = measureSnaps.has('midpoint'); break;
+      case 'center': active = measureSnaps.has('center'); break;
+      case 'quadrant': active = measureSnaps.has('quadrant'); break;
+    }
+    if (!active) continue;
+    const dx = pt.x - world.x, dy = pt.y - world.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) { bestD2 = d2; best = { x: pt.x, y: pt.y, type: pt.type }; }
+  }
+  if (best) return best;
+
+  if (measureSnaps.has('perpendicular') && measurePoints.length > 0) {
+    const ref = measurePoints[measurePoints.length - 1];
+    for (const seg of state.segments) {
+      const dx = seg.x2 - seg.x1, dy = seg.y2 - seg.y1;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq < 1e-12) continue;
+      const t = ((ref.x - seg.x1) * dx + (ref.y - seg.y1) * dy) / lenSq;
+      if (t < -0.05 || t > 1.05) continue;
+      const fx = seg.x1 + t * dx, fy = seg.y1 + t * dy;
+      const dx2 = fx - world.x, dy2 = fy - world.y;
+      const d2 = dx2 * dx2 + dy2 * dy2;
+      if (d2 < bestD2) { bestD2 = d2; best = { x: fx, y: fy, type: 'perpendicular' }; }
+    }
+    if (best) return best;
+  }
+
+  if (measureSnaps.has('intersection')) {
+    const near = [];
+    for (const seg of state.segments) {
+      const d2 = pointSegDist2(world.x, world.y, seg.x1, seg.y1, seg.x2, seg.y2);
+      if (d2 <= worldR2 * 16) near.push(seg);
+    }
+    for (let a = 0; a < near.length; a++) {
+      for (let b = a + 1; b < near.length; b++) {
+        const sA = near[a], sB = near[b];
+        const d1x = sA.x2 - sA.x1, d1y = sA.y2 - sA.y1;
+        const d2x = sB.x2 - sB.x1, d2y = sB.y2 - sB.y1;
+        const denom = d1x * d2y - d1y * d2x;
+        if (Math.abs(denom) < 1e-12) continue;
+        const t = ((sB.x1 - sA.x1) * d2y - (sB.y1 - sA.y1) * d2x) / denom;
+        const u = ((sB.x1 - sA.x1) * d1y - (sB.y1 - sA.y1) * d1x) / denom;
+        if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+        const ix = sA.x1 + t * d1x, iy = sA.y1 + t * d1y;
+        const dx = ix - world.x, dy = iy - world.y;
+        const dd = dx * dx + dy * dy;
+        if (dd < bestD2) { bestD2 = dd; best = { x: ix, y: iy, type: 'intersection' }; }
+      }
+    }
+    if (best) return best;
+  }
+
+  if (measureSnaps.has('nearest')) {
+    for (const seg of state.segments) {
+      const dx = seg.x2 - seg.x1, dy = seg.y2 - seg.y1;
+      const lenSq = dx * dx + dy * dy;
+      let t = lenSq > 1e-12 ? ((world.x - seg.x1) * dx + (world.y - seg.y1) * dy) / lenSq : 0;
+      t = Math.max(0, Math.min(1, t));
+      const cx = seg.x1 + t * dx, cy = seg.y1 + t * dy;
+      const ddx = cx - world.x, ddy = cy - world.y;
+      const dd = ddx * ddx + ddy * ddy;
+      if (dd < bestD2) { bestD2 = dd; best = { x: cx, y: cy, type: 'nearest' }; }
+    }
+  }
+  return best;
+}
+
+function enterMeasureMode() {
+  if (clickHideMode) {
+    clickHideMode = false;
+    DOM.btnClickHide.classList.remove('active', 'active-danger');
+    DOM.canvasContainer.classList.remove('mode-clickhide');
+  }
+  if (pdfAreaMode) exitPdfAreaMode();
+  measureMode = true;
+  DOM.measurePanel.classList.add('activo');
+  DOM.canvasContainer.classList.add('mode-measure');
+  DOM.btnMeasure.classList.add('active');
+  clearMeasure();
+  notificar('Modo medición activo');
+}
+function exitMeasureMode() {
+  measureMode = false;
+  DOM.measurePanel.classList.remove('activo');
+  DOM.canvasContainer.classList.remove('mode-measure');
+  DOM.btnMeasure.classList.remove('active');
+  clearMeasure();
+  DOM.snapMarker.classList.add('oculto');
+  DOM.measureResult.innerHTML = '<span class="mr-hint">Elegí una herramienta y hacé clic sobre el dibujo.</span>';
+  drawMeasurePreview();
+}
+function clearMeasure() {
+  measurePoints = [];
+  lastSnapPoint = null;
+  DOM.snapMarker.classList.add('oculto');
+  drawMeasurePreview();
+}
+
+function updateMeasureResult() {
+  const n = measurePoints.length;
+  if (measureTool === 'distance' && n === 2) {
+    const d = dist2d(measurePoints[0], measurePoints[1]);
+    const dx = measurePoints[1].x - measurePoints[0].x;
+    const dy = measurePoints[1].y - measurePoints[0].y;
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    DOM.measureResult.innerHTML = `<span class="mr-label">Distancia:</span> <span class="mr-value">${d.toFixed(3)} m</span><br><span class="mr-label">ΔX:</span> ${dx.toFixed(3)} m · <span class="mr-label">ΔY:</span> ${dy.toFixed(3)} m<br><span class="mr-label">Ángulo:</span> ${ang.toFixed(2)}°`;
+  } else if (measureTool === 'polyline' && n >= 2) {
+    let total = 0;
+    for (let i = 0; i < n - 1; i++) total += dist2d(measurePoints[i], measurePoints[i + 1]);
+    DOM.measureResult.innerHTML = `<span class="mr-label">Longitud total:</span> <span class="mr-value">${total.toFixed(3)} m</span><br><span class="mr-label">Vértices:</span> ${n}`;
+  } else if (measureTool === 'area' && n >= 3) {
+    let area = 0;
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; area += measurePoints[i].x * measurePoints[j].y - measurePoints[j].x * measurePoints[i].y; }
+    area = Math.abs(area) / 2;
+    let perim = 0;
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; perim += dist2d(measurePoints[i], measurePoints[j]); }
+    DOM.measureResult.innerHTML = `<span class="mr-label">Área:</span> <span class="mr-value">${area.toFixed(3)} m²</span><br><span class="mr-label">Perímetro:</span> ${perim.toFixed(3)} m<br><span class="mr-label">Vértices:</span> ${n}`;
+  } else if (measureTool === 'angle' && n === 3) {
+    const v1 = { x: measurePoints[0].x - measurePoints[1].x, y: measurePoints[0].y - measurePoints[1].y };
+    const v2 = { x: measurePoints[2].x - measurePoints[1].x, y: measurePoints[2].y - measurePoints[1].y };
+    const dot = v1.x * v2.x + v1.y * v2.y;
+    const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
+    const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+    const ang = Math.acos(cos) * 180 / Math.PI;
+    DOM.measureResult.innerHTML = `<span class="mr-label">Ángulo:</span> <span class="mr-value">${ang.toFixed(3)}°</span>`;
+  }
+}
+
+function updateMeasureHint() {
+  const hints = {
+    distance: 'Hacé clic en dos puntos para medir la distancia.',
+    polyline: 'Hacé clic en varios puntos. Doble clic o ESC para terminar.',
+    area: 'Hacé clic en los vértices del polígono. Doble clic o ESC para cerrar y calcular área.',
+    angle: 'Hacé clic en tres puntos: inicial, vértice y final.',
+  };
+  if (measurePoints.length === 0) {
+    DOM.measureResult.innerHTML = `<span class="mr-hint">${hints[measureTool]}</span>`;
+  }
+}
+
+function finishCurrentMeasurement() {
+  const valSpan = DOM.measureResult.querySelector('.mr-value');
+  const valText = valSpan ? valSpan.textContent : 'Hecho';
+  measureHistory.push({
+    id: ++measureHistorySeq,
+    tool: measureTool,
+    points: [...measurePoints],
+    value: valText,
+  });
+  renderMeasureHistoryList();
+  measurePoints = [];
+  lastSnapPoint = null;
+  DOM.snapMarker.classList.add('oculto');
+  drawMeasurePreview();
 }
 
 function renderMeasureHistoryList() {
   const container = DOM.measureHistory;
   container.innerHTML = '';
-  if (measureHistory.length === 0) {
-    container.style.display = 'none';
-    return;
-  }
+  if (measureHistory.length === 0) { container.style.display = 'none'; return; }
   container.style.display = 'flex';
   measureHistory.forEach(item => {
     const el = document.createElement('div');
@@ -1814,217 +2030,175 @@ function renderMeasureHistoryList() {
   });
 }
 
-DOM.btnMeasureClearHistory.addEventListener('click', () => {
-  measureHistory = [];
-  renderMeasureHistoryList();
-  drawMeasurePreview();
-});
-
-function enterMeasureMode() {
-  if (clickHideMode) { clickHideMode = false; DOM.btnClickHide.classList.remove('active', 'active-danger'); DOM.canvasContainer.classList.remove('mode-clickhide'); }
-  if (pdfAreaMode) exitPdfAreaMode();
-  measureMode = true;
-  DOM.measurePanel.classList.add('activo');
-  DOM.canvasContainer.classList.add('mode-measure');
-  DOM.btnMeasure.classList.add('active');
-  clearMeasure();
-  notificar('Modo medición activo. Elegí una herramienta y hacé clic.');
-}
-function exitMeasureMode() {
-  measureMode = false;
-  DOM.measurePanel.classList.remove('activo');
-  DOM.canvasContainer.classList.remove('mode-measure');
-  DOM.btnMeasure.classList.remove('active');
-  clearMeasure();
-  DOM.snapMarker.classList.add('oculto');
-  DOM.measureResult.innerHTML = '<span class="mr-hint">Elegí una herramienta y hacé clic sobre el dibujo.</span>';
-  drawMeasurePreview();
-}
-function clearMeasure() {
-  measurePoints = []; lastSnapPoint = null;
-  DOM.snapMarker.classList.add('oculto');
-  drawMeasurePreview();
-}
-
-DOM.btnMeasure.addEventListener('click', () => { if (measureMode) exitMeasureMode(); else enterMeasureMode(); });
-DOM.btnMeasureClose.addEventListener('click', () => exitMeasureMode());
-
-document.querySelectorAll('.measure-tool-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.measure-tool-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    measureTool = btn.dataset.tool;
-    clearMeasure();
-    updateMeasureHint();
-  });
-});
-document.querySelectorAll('.snap-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const snap = btn.dataset.snap;
-    if (measureSnaps.has(snap)) { measureSnaps.delete(snap); btn.classList.remove('active'); }
-    else { measureSnaps.add(snap); btn.classList.add('active'); }
-  });
-});
-function updateMeasureHint() {
-  const hints = {
-    distance: 'Hacé clic en dos puntos para medir la distancia.',
-    polyline: 'Hacé clic en varios puntos. Doble clic o ESC para terminar.',
-    area: 'Hacé clic en los vértices del polígono. Doble clic o ESC para cerrar y calcular área.',
-    angle: 'Hacé clic en tres puntos: inicial, vértice y final.',
-  };
-  if (measurePoints.length === 0) { DOM.measureResult.innerHTML = `<span class="mr-hint">${hints[measureTool]}</span>`; }
-}
-
-DOM.viewerContainer.addEventListener('mousemove', (e) => {
-  mouseScreen = { x: e.clientX, y: e.clientY };
-  if (!measureMode) return;
-  const snap = findSnapPoint(e.clientX, e.clientY);
-  if (snap) {
-    lastSnapPoint = snap;
-    DOM.snapMarker.classList.remove('oculto');
-    DOM.snapMarker.style.left = snap.screenX + 'px';
-    DOM.snapMarker.style.top = snap.screenY + 'px';
-    DOM.snapMarker.setAttribute('data-type', snap.type);
-    DOM.snapMarkerLabel.textContent = SNAP_LABELS[snap.type] || snap.type;
-  } else {
-    lastSnapPoint = null;
-    DOM.snapMarker.classList.add('oculto');
+/* ============================================================
+   PICKING 2D
+============================================================ */
+function pickLayerAtPoint(clientX, clientY, threshold = 12) {
+  if (state.segments.length === 0) return null;
+  const world = screenToWorld(clientX, clientY);
+  const worldR2 = (threshold * state.view.scale) ** 2;
+  let bestLayer = null, bestD2 = worldR2;
+  for (const seg of state.segments) {
+    const d2 = pointSegDist2(world.x, world.y, seg.x1, seg.y1, seg.x2, seg.y2);
+    if (d2 < bestD2) { bestD2 = d2; bestLayer = seg.layerName; }
   }
-  drawMeasurePreview();
-  if (measurePoints.length > 0) updateMeasureResultLive();
-});
-
-function finishCurrentMeasurement() {
-  const valSpan = DOM.measureResult.querySelector('.mr-value');
-  const valText = valSpan ? valSpan.textContent : 'Hecho';
-  measureHistory.push({
-    id: ++measureHistorySeq,
-    tool: measureTool,
-    points: [...measurePoints],
-    value: valText
-  });
-  renderMeasureHistoryList();
-
-  measurePoints = [];
-  lastSnapPoint = null;
-  DOM.snapMarker.classList.add('oculto');
-  drawMeasurePreview();
+  return bestLayer;
 }
 
-DOM.viewerContainer.addEventListener('click', (e) => {
-  if (!measureMode) return;
-  e.stopPropagation(); e.preventDefault();
-  const snap = findSnapPoint(e.clientX, e.clientY);
-  let worldPoint;
-  if (snap) { worldPoint = { x: snap.x, y: snap.y, z: 0 }; }
-  else {
-    const wp = projectScreenToWorld(e.clientX, e.clientY);
-    if (!wp) return;
-    worldPoint = wp;
-  }
-  measurePoints.push(worldPoint);
-  updateMeasureResult();
-
-  if (measureTool === 'distance' && measurePoints.length === 2) {
-    finishCurrentMeasurement();
-  } else if (measureTool === 'angle' && measurePoints.length === 3) {
-    finishCurrentMeasurement();
-  } else {
-    drawMeasurePreview();
-  }
-}, true);
-
-DOM.viewerContainer.addEventListener('dblclick', (e) => {
-  if (!measureMode) return;
-  if (measureTool === 'polyline' || measureTool === 'area') {
-    e.stopPropagation(); e.preventDefault();
-    if (measurePoints.length > 2) {
-       const p1 = measurePoints[measurePoints.length - 1];
-       const p2 = measurePoints[measurePoints.length - 2];
-       if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1e-9) {
-           measurePoints.pop();
-       }
-    }
-    updateMeasureResult();
-    finishCurrentMeasurement();
-  }
-});
-
-function updateMeasureResult() {
-  const n = measurePoints.length;
-  if (measureTool === 'distance' && n === 2) {
-    const d = dist2d(measurePoints[0], measurePoints[1]);
-    const dx = measurePoints[1].x - measurePoints[0].x;
-    const dy = measurePoints[1].y - measurePoints[0].y;
-    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
-    DOM.measureResult.innerHTML = `<span class="mr-label">Distancia:</span> <span class="mr-value">${d.toFixed(3)} m</span><br><span class="mr-label">ΔX:</span> ${dx.toFixed(3)} m · <span class="mr-label">ΔY:</span> ${dy.toFixed(3)} m<br><span class="mr-label">Ángulo:</span> ${ang.toFixed(2)}°`;
-  } else if (measureTool === 'polyline' && n >= 2) {
-    let total = 0;
-    for (let i = 0; i < n - 1; i++) total += dist2d(measurePoints[i], measurePoints[i + 1]);
-    DOM.measureResult.innerHTML = `<span class="mr-label">Longitud total:</span> <span class="mr-value">${total.toFixed(3)} m</span><br><span class="mr-label">Vértices:</span> ${n}`;
-  } else if (measureTool === 'area' && n >= 3) {
-    let area = 0;
-    for (let i = 0; i < n; i++) { const j = (i + 1) % n; area += measurePoints[i].x * measurePoints[j].y; area -= measurePoints[j].x * measurePoints[i].y; }
-    area = Math.abs(area) / 2;
-    let perim = 0;
-    for (let i = 0; i < n; i++) { const j = (i + 1) % n; perim += dist2d(measurePoints[i], measurePoints[j]); }
-    DOM.measureResult.innerHTML = `<span class="mr-label">Área:</span> <span class="mr-value">${area.toFixed(3)} m²</span><br><span class="mr-label">Perímetro:</span> ${perim.toFixed(3)} m<br><span class="mr-label">Vértices:</span> ${n}`;
-  } else if (measureTool === 'angle' && n === 3) {
-    const v1 = { x: measurePoints[0].x - measurePoints[1].x, y: measurePoints[0].y - measurePoints[1].y };
-    const v2 = { x: measurePoints[2].x - measurePoints[1].x, y: measurePoints[2].y - measurePoints[1].y };
-    const dot = v1.x * v2.x + v1.y * v2.y;
-    const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
-    const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
-    const ang = Math.acos(cos) * 180 / Math.PI;
-    DOM.measureResult.innerHTML = `<span class="mr-label">Ángulo:</span> <span class="mr-value">${ang.toFixed(3)}°</span>`;
-  } else { updateMeasureHint(); }
-}
-
-function updateMeasureResultLive() {
-  const n = measurePoints.length;
-  if (n === 0) return;
-  const last = measurePoints[n - 1];
-  let curPoint = null;
-  if (lastSnapPoint) curPoint = { x: lastSnapPoint.x, y: lastSnapPoint.y, z: 0 };
-  else {
-    curPoint = projectScreenToWorld(mouseScreen.x, mouseScreen.y);
-    if (!curPoint) return;
-  }
-  if (measureTool === 'distance' && n === 1) {
-    const d = dist2d(measurePoints[0], curPoint);
-    const dx = curPoint.x - measurePoints[0].x, dy = curPoint.y - measurePoints[0].y;
-    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
-    DOM.measureResult.innerHTML = `<span class="mr-label">Distancia:</span> <span class="mr-value">${d.toFixed(3)} m</span><br><span class="mr-label">ΔX:</span> ${dx.toFixed(3)} m · <span class="mr-label">ΔY:</span> ${dy.toFixed(3)} m<br><span class="mr-label">Ángulo:</span> ${ang.toFixed(2)}°`;
-  } else if (measureTool === 'polyline' && n >= 1) {
-    let total = 0;
-    for (let i = 0; i < n - 1; i++) total += dist2d(measurePoints[i], measurePoints[i + 1]);
-    total += dist2d(last, curPoint);
-    DOM.measureResult.innerHTML = `<span class="mr-label">Longitud total:</span> <span class="mr-value">${total.toFixed(3)} m</span><br><span class="mr-label">Vértices:</span> ${n} (+ cursor)`;
-  } else if (measureTool === 'area' && n >= 1) {
-    const pts = [...measurePoints, curPoint];
-    let area = 0;
-    for (let i = 0; i < pts.length; i++) { const j = (i + 1) % pts.length; area += pts[i].x * pts[j].y; area -= pts[j].x * pts[i].y; }
-    area = Math.abs(area) / 2;
-    let perim = 0;
-    for (let i = 0; i < pts.length; i++) { const j = (i + 1) % pts.length; perim += dist2d(pts[i], pts[j]); }
-    DOM.measureResult.innerHTML = `<span class="mr-label">Área (preliminar):</span> <span class="mr-value">${area.toFixed(3)} m²</span><br><span class="mr-label">Perímetro:</span> ${perim.toFixed(3)} m<br><span class="mr-label">Vértices:</span> ${n} (+ cursor)`;
-  } else if (measureTool === 'angle' && n >= 1) {
-    if (n === 1) {
-      const d = dist2d(measurePoints[0], curPoint);
-      DOM.measureResult.innerHTML = `<span class="mr-label">Distancia al vértice:</span> <span class="mr-value">${d.toFixed(3)} m</span><br><span class="mr-hint">Clic para fijar el vértice.</span>`;
-    } else if (n === 2) {
-      const v1 = { x: measurePoints[0].x - measurePoints[1].x, y: measurePoints[0].y - measurePoints[1].y };
-      const v2 = { x: curPoint.x - measurePoints[1].x, y: curPoint.y - measurePoints[1].y };
-      const dot = v1.x * v2.x + v1.y * v2.y;
-      const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
-      const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
-      const ang = Math.acos(cos) * 180 / Math.PI;
-      DOM.measureResult.innerHTML = `<span class="mr-label">Ángulo (preliminar):</span> <span class="mr-value">${ang.toFixed(3)}°</span><br><span class="mr-hint">Clic para fijar el punto final.</span>`;
+function pickLayersInBox(x1, y1, x2, y2) {
+  const w1 = screenToWorld(x1, y1);
+  const w2 = screenToWorld(x2, y2);
+  const minX = Math.min(w1.x, w2.x), maxX = Math.max(w1.x, w2.x);
+  const minY = Math.min(w1.y, w2.y), maxY = Math.max(w1.y, w2.y);
+  const set = new Set();
+  for (const seg of state.segments) {
+    if ((seg.x1 >= minX && seg.x1 <= maxX && seg.y1 >= minY && seg.y1 <= maxY) ||
+        (seg.x2 >= minX && seg.x2 <= maxX && seg.y2 >= minY && seg.y2 <= maxY)) {
+      set.add(seg.layerName);
     }
   }
+  return [...set];
 }
 
-function dist2d(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
+/* ============================================================
+   UI: CAPAS
+============================================================ */
+function renderLayers() {
+  DOM.layerList.innerHTML = '';
+  if (state.layers.size === 0) {
+    DOM.layerList.appendChild(DOM.layerEmpty);
+    DOM.layerEmpty.style.display = '';
+    DOM.layerCount.textContent = '0';
+    DOM.btnToggleAll.disabled = true;
+    DOM.btnClickHide.disabled = true;
+    return;
+  }
+  DOM.layerEmpty.style.display = 'none';
+  DOM.layerCount.textContent = String(state.layers.size);
+  DOM.btnToggleAll.disabled = false;
+  DOM.btnClickHide.disabled = false;
+  updateToggleAllIcon();
+
+  const entries = [...state.layers.entries()].sort((a, b) => {
+    if (a[1].visible !== b[1].visible) return a[1].visible ? -1 : 1;
+    return a[0].localeCompare(b[0]);
+  });
+
+  for (const [name, info] of entries) {
+    const item = document.createElement('label');
+    item.className = 'layer-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = info.visible !== false;
+    cb.addEventListener('change', () => {
+      const old = info.visible !== false;
+      const nuevo = cb.checked;
+      if (!undoing) {
+        layerHistory.push([{ name, oldVisible: old, newVisible: nuevo }]);
+        if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
+        updateUndoUI();
+      }
+      setLayerVisible(name, nuevo);
+      updateToggleAllIcon();
+    });
+
+    const sw = document.createElement('span');
+    sw.className = 'layer-color';
+    sw.style.background = info.color;
+
+    const nm = document.createElement('span');
+    nm.className = 'layer-name';
+    nm.textContent = name;
+    nm.title = name;
+
+    item.appendChild(cb);
+    item.appendChild(sw);
+    item.appendChild(nm);
+
+    if (info.lineweight !== -3 && info.lineweight !== -1) {
+      const lw = document.createElement('span');
+      lw.className = 'layer-lw';
+      lw.textContent = info.lineweight === 0 ? 'def' : (info.lineweight / 100).toFixed(2) + 'mm';
+      item.appendChild(lw);
+    }
+
+    DOM.layerList.appendChild(item);
+  }
+}
+
+function updateToggleAllIcon() {
+  const total = state.layers.size;
+  const visibles = [...state.layers.values()].filter(v => v.visible !== false).length;
+  const allVisible = visibles === total && total > 0;
+  const svg = DOM.btnToggleAll.querySelector('svg');
+  if (svg) {
+    if (allVisible) {
+      svg.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+    } else {
+      svg.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+    }
+  }
+  DOM.btnToggleAll.title = allVisible ? 'Ocultar todas las capas' : 'Mostrar todas las capas';
+}
+
+DOM.btnToggleAll.addEventListener('click', () => {
+  if (state.layers.size === 0) return;
+  const names = [...state.layers.keys()];
+  const anyVisible = names.some(n => state.layers.get(n).visible !== false);
+  const target = !anyVisible;
+  const changes = [];
+  for (const name of names) {
+    const info = state.layers.get(name);
+    if ((info.visible !== false) === target) continue;
+    changes.push({ name, oldVisible: info.visible !== false, newVisible: target });
+    info.visible = target;
+    setLayerVisible(name, target);
+  }
+  if (changes.length === 0) {
+    notificar(target ? 'Todas ya visibles' : 'Todas ya ocultas', 'warn');
+    return;
+  }
+  if (!undoing) {
+    layerHistory.push(changes);
+    if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
+    updateUndoUI();
+  }
+  renderLayers();
+  notificar(target ? `Mostradas ${changes.length} capa(s)` : `Ocultadas ${changes.length} capa(s)`);
+});
+
+function undoLayerChange() {
+  if (layerHistory.length === 0) return false;
+  const changes = layerHistory.pop();
+  undoing = true;
+  try {
+    for (const c of changes) {
+      state.layers.get(c.name).visible = c.oldVisible;
+      setLayerVisible(c.name, c.oldVisible);
+    }
+    renderLayers();
+  } finally { undoing = false; }
+  updateUndoUI();
+  return true;
+}
+function updateUndoUI() {
+  const n = layerHistory.length;
+  DOM.btnUndo.disabled = n === 0;
+  if (n > 0) { DOM.undoBadge.style.display = ''; DOM.undoBadge.textContent = String(n); }
+  else { DOM.undoBadge.style.display = 'none'; }
+}
+DOM.btnUndo.addEventListener('click', () => {
+  if (undoLayerChange()) notificar('Cambio deshecho');
+  else notificar('Nada para deshacer', 'warn');
+});
+
+/* ============================================================
+   CLICK-HIDE / PDF AREA
+============================================================ */
+let clickHideMode = false;
+let pdfAreaMode = false;
+let selState = null, selRectEl = null;
 
 DOM.btnClickHide.addEventListener('click', () => {
   if (DOM.btnClickHide.disabled) return;
@@ -2034,13 +2208,13 @@ DOM.btnClickHide.addEventListener('click', () => {
   DOM.btnClickHide.classList.toggle('active', clickHideMode);
   DOM.btnClickHide.classList.toggle('active-danger', clickHideMode);
   DOM.canvasContainer.classList.toggle('mode-clickhide', clickHideMode);
-  if (clickHideMode) notificar('Clic sobre un objeto o arrastrá un cuadro para apagar su capa');
+  if (clickHideMode) notificar('Clic o arrastrá un cuadro para apagar la capa');
 });
 
-let selState = null, selRectEl = null;
 DOM.viewerContainer.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch') return;
   if (e.button !== 0) return;
-  if (!clickHideMode && !pdfAreaMode && !measureMode) return;
+  if (!clickHideMode && !pdfAreaMode) return;
   if (measureMode) return;
   e.stopPropagation(); e.preventDefault();
   selState = { startX: e.clientX, startY: e.clientY, moved: false };
@@ -2068,126 +2242,126 @@ document.addEventListener('pointerup', (e) => {
   const start = selState; selState = null;
   if (selRectEl) { selRectEl.remove(); selRectEl = null; }
   if (e.button !== 0) return;
+
   if (pdfAreaMode) {
-    if (!start.moved) { notificar('Arrastrá un rectángulo para definir el área', 'warn'); return; }
+    if (!start.moved) { notificar('Arrastrá un rectángulo', 'warn'); return; }
     const x1 = Math.min(start.startX, e.clientX), y1 = Math.min(start.startY, e.clientY);
     const x2 = Math.max(start.startX, e.clientX), y2 = Math.max(start.startY, e.clientY);
     exitPdfAreaMode();
     generatePdfFromRegion(x1, y1, x2 - x1, y2 - y1);
     return;
   }
+
   if (!clickHideMode) return;
-  syncLayersStateFromScene();
+
   if (!start.moved) {
     const lname = pickLayerAtPoint(e.clientX, e.clientY);
-    if (!lname) { notificar('No se encontró objeto aquí', 'warn'); return; }
-    const info = layersState.get(lname);
-    if (!info) { notificar(`Capa "${lname}" no encontrada`, 'warn'); return; }
-    if (!info.visible) { notificar(`La capa "${lname}" ya está oculta`, 'warn'); return; }
+    if (!lname) { notificar('No se encontró objeto', 'warn'); return; }
+    const info = state.layers.get(lname);
+    if (!info) { notificar('Capa no encontrada', 'warn'); return; }
+    if (info.visible === false) { notificar('Capa ya oculta', 'warn'); return; }
     info.visible = false;
-    setLayersVisible([{ name: lname, show: false }]);
-    if (!undoing) { layerHistory.push([{ name: lname, oldVisible: true, newVisible: false }]); if (layerHistory.length > MAX_HISTORY) layerHistory.shift(); updateUndoUI(); }
+    setLayerVisible(lname, false);
+    if (!undoing) {
+      layerHistory.push([{ name: lname, oldVisible: true, newVisible: false }]);
+      if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
+      updateUndoUI();
+    }
     renderLayers();
     notificar(`Capa apagada: ${lname}`);
   } else {
-    const layersInBox = pickLayersInBox(start.startX, start.startY, e.clientX, e.clientY);
-    if (layersInBox.length === 0) { notificar('Ningún objeto dentro del cuadro', 'warn'); return; }
+    const layers = pickLayersInBox(start.startX, start.startY, e.clientX, e.clientY);
+    if (layers.length === 0) { notificar('Nada dentro del cuadro', 'warn'); return; }
     const changes = [];
-    for (const lname of layersInBox) {
-      const info = layersState.get(lname);
-      if (!info || !info.visible) continue;
+    for (const lname of layers) {
+      const info = state.layers.get(lname);
+      if (!info || info.visible === false) continue;
       changes.push({ name: lname, oldVisible: true, newVisible: false });
       info.visible = false;
+      setLayerVisible(lname, false);
     }
-    if (changes.length === 0) { notificar('Las capas del cuadro ya estaban ocultas', 'warn'); return; }
-    setLayersVisible(changes.map(c => ({ name: c.name, show: false })));
-    if (!undoing) { layerHistory.push(changes); if (layerHistory.length > MAX_HISTORY) layerHistory.shift(); updateUndoUI(); }
+    if (changes.length === 0) { notificar('Ya estaban ocultas', 'warn'); return; }
+    if (!undoing) {
+      layerHistory.push(changes);
+      if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
+      updateUndoUI();
+    }
     renderLayers();
     notificar(`${changes.length} capa(s) apagada(s)`);
   }
 }, true);
 
 /* ============================================================
-   PDF — jsPDF + svg2pdf (2.x) unificados
+   PDF
 ============================================================ */
 function buildPdfName(prefix) {
   const base = stats.fileName ? stats.fileName.replace(/\.[^.]+$/, '') : 'plano';
-  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
   return `${base}_${prefix}_${stamp}.pdf`;
 }
 
 async function loadPDFLibs() {
   if (!window.jspdf || !window.jspdf.jsPDF) {
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
-      script.onload = resolve;
-      script.onerror = () => reject(new Error('Error al cargar jsPDF'));
-      document.head.appendChild(script);
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+      s.onload = res; s.onerror = () => rej(new Error('jsPDF no cargó'));
+      document.head.appendChild(s);
     });
   }
-
   if (typeof window.jspdf.jsPDF.prototype.svg !== 'function') {
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js';
-      script.onload = resolve;
-      script.onerror = () => reject(new Error('Error al cargar svg2pdf'));
-      document.head.appendChild(script);
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js';
+      s.onload = res; s.onerror = () => rej(new Error('svg2pdf no cargó'));
+      document.head.appendChild(s);
     });
   }
-
   return window.jspdf.jsPDF;
 }
 
 async function generatePdfVectorial(regionRect) {
-  if ((!lineSegments || lineSegments.length === 0) &&
-      (!textEntities || textEntities.length === 0)) {
-    notificar('No hay datos vectoriales para exportar', 'error');
+  if (state.segments.length === 0 && state.texts.length === 0) {
+    notificar('No hay datos para exportar', 'error');
     return;
   }
 
   DOM.loadingOverlay.classList.add('activo');
-  DOM.loadingLabel.textContent = 'Generando PDF vectorial…';
+  DOM.loadingLabel.textContent = 'Generando PDF…';
   DOM.loadingSub.textContent = 'Procesando geometría y textos.';
 
   try {
     const jsPDF = await loadPDFLibs();
 
-    let vectorLines = lineSegments || [];
-    let texts = textEntities || [];
+    let segs = state.segments;
+    let texts = state.texts;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-    for (const l of vectorLines) {
-      minX = Math.min(minX, l.x1, l.x2); maxX = Math.max(maxX, l.x1, l.x2);
-      minY = Math.min(minY, l.y1, l.y2); maxY = Math.max(maxY, l.y1, l.y2);
+    for (const s of segs) {
+      minX = Math.min(minX, s.x1, s.x2); maxX = Math.max(maxX, s.x1, s.x2);
+      minY = Math.min(minY, s.y1, s.y2); maxY = Math.max(maxY, s.y1, s.y2);
     }
     for (const t of texts) {
-      const approxW = t.text.length * t.height * 0.6;
-      minX = Math.min(minX, t.x);
-      maxX = Math.max(maxX, t.x + approxW);
-      minY = Math.min(minY, t.y);
-      maxY = Math.max(maxY, t.y + t.height);
+      const w = t.text.length * t.height * 0.6;
+      minX = Math.min(minX, t.x); maxX = Math.max(maxX, t.x + w);
+      minY = Math.min(minY, t.y); maxY = Math.max(maxY, t.y + t.height);
     }
 
-    if (!isFinite(minX)) throw new Error('Límites inválidos en la geometría');
+    if (!isFinite(minX)) throw new Error('Sin bounds');
 
     if (regionRect) {
       const { x1: rx1, y1: ry1, x2: rx2, y2: ry2 } = regionRect;
-      vectorLines = vectorLines.filter(l => {
-        const lx1 = Math.min(l.x1, l.x2), lx2 = Math.max(l.x1, l.x2);
-        const ly1 = Math.min(l.y1, l.y2), ly2 = Math.max(l.y1, l.y2);
+      segs = segs.filter(s => {
+        const lx1 = Math.min(s.x1, s.x2), lx2 = Math.max(s.x1, s.x2);
+        const ly1 = Math.min(s.y1, s.y2), ly2 = Math.max(s.y1, s.y2);
         return !(lx2 < rx1 || lx1 > rx2 || ly2 < ry1 || ly1 > ry2);
       });
-      texts = texts.filter(t =>
-        t.x >= rx1 && t.x <= rx2 && t.y >= ry1 && t.y <= ry2
-      );
+      texts = texts.filter(t => t.x >= rx1 && t.x <= rx2 && t.y >= ry1 && t.y <= ry2);
       minX = rx1; maxX = rx2; minY = ry1; maxY = ry2;
     }
 
-    if (vectorLines.length === 0 && texts.length === 0) {
-      notificar('El área seleccionada está vacía', 'warn');
-      return;
+    if (segs.length === 0 && texts.length === 0) {
+      notificar('Área vacía', 'warn'); return;
     }
 
     const w = Math.max(1e-3, maxX - minX);
@@ -2197,27 +2371,23 @@ async function generatePdfVectorial(regionRect) {
     const svgW = w * scale + 2 * margin;
     const svgH = h * scale + 2 * margin;
 
-    const svgLines = vectorLines.map(l => {
-      const x1 = margin + (l.x1 - minX) * scale;
-      const y1 = svgH - margin - (l.y1 - minY) * scale;
-      const x2 = margin + (l.x2 - minX) * scale;
-      const y2 = svgH - margin - (l.y2 - minY) * scale;
+    const svgLines = segs.map(s => {
+      const x1 = margin + (s.x1 - minX) * scale;
+      const y1 = svgH - margin - (s.y1 - minY) * scale;
+      const x2 = margin + (s.x2 - minX) * scale;
+      const y2 = svgH - margin - (s.y2 - minY) * scale;
       return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="black" stroke-width="0.3"/>`;
     });
 
-    const escapeXml = (s) => s
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
     const svgTexts = texts.map(t => {
       const x = margin + (t.x - minX) * scale;
       const y = svgH - margin - (t.y - minY) * scale;
       const fs = Math.max(1, t.height * scale);
       const rot = -(t.rotation || 0);
-      const transform = rot
-        ? ` transform="rotate(${rot.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)})"`
-        : '';
-      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${fs.toFixed(2)}" font-family="monospace" fill="black"${transform}>${escapeXml(t.text)}</text>`;
+      const tr = rot ? ` transform="rotate(${rot.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)})"` : '';
+      return `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${fs.toFixed(2)}" font-family="monospace" fill="black"${tr}>${esc(t.text)}</text>`;
     });
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">
@@ -2226,46 +2396,268 @@ async function generatePdfVectorial(regionRect) {
       ${svgTexts.join('')}
     </svg>`;
 
-    const parser = new DOMParser();
-    const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
-    const svgElement = svgDoc.documentElement;
+    const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+    const svgElement = doc.documentElement;
 
     const pdf = new jsPDF({
       orientation: svgW > svgH ? 'landscape' : 'portrait',
-      unit: 'pt', format: [svgW, svgH]
+      unit: 'pt', format: [svgW, svgH],
     });
 
     await pdf.svg(svgElement, { x: 0, y: 0, width: svgW, height: svgH });
-
     pdf.save(buildPdfName(regionRect ? 'area' : 'vista'));
-    notificar('PDF generado exitosamente');
+    notificar('PDF generado');
   } catch (e) {
     console.error(e);
-    notificar('Error al generar PDF: ' + (e.message || e), 'error');
+    notificar('Error PDF: ' + (e.message || e), 'error');
   } finally {
     DOM.loadingOverlay.classList.remove('activo');
   }
 }
 
 function generatePdfFromRegion(screenX, screenY, screenW, screenH) {
-  try {
-    const tl = projectScreenToWorld(screenX, screenY);
-    const br = projectScreenToWorld(screenX + screenW, screenY + screenH);
-    if (!tl || !br) { notificar('No se pudo calcular el área', 'warn'); return; }
+  const tl = screenToWorld(screenX, screenY);
+  const br = screenToWorld(screenX + screenW, screenY + screenH);
+  generatePdfVectorial({
+    x1: Math.min(tl.x, br.x),
+    y1: Math.min(tl.y, br.y),
+    x2: Math.max(tl.x, br.x),
+    y2: Math.max(tl.y, br.y),
+  });
+}
 
-    const regionRect = {
-      x1: Math.min(tl.x, br.x),
-      y1: Math.min(tl.y, br.y),
-      x2: Math.max(tl.x, br.x),
-      y2: Math.max(tl.y, br.y),
-    };
-    generatePdfVectorial(regionRect);
-  } catch (e) {
-    notificar('Error al procesar área: ' + (e.message || e), 'error');
+function enterPdfAreaMode() {
+  if (clickHideMode) {
+    clickHideMode = false;
+    DOM.btnClickHide.classList.remove('active', 'active-danger');
+    DOM.canvasContainer.classList.remove('mode-clickhide');
+  }
+  if (measureMode) exitMeasureMode();
+  pdfAreaMode = true;
+  DOM.canvasContainer.classList.add('mode-pdfarea');
+  notificar('Arrastrá un rectángulo');
+}
+function exitPdfAreaMode() {
+  pdfAreaMode = false;
+  DOM.canvasContainer.classList.remove('mode-pdfarea');
+}
+
+/* ============================================================
+   LOAD FILE
+============================================================ */
+async function processFile(file) {
+  if (!file) return;
+  const isDwg = /\.dwg$/i.test(file.name);
+  const isDxf = /\.dxf$/i.test(file.name);
+  if (!isDwg && !isDxf) { notificar('Debe ser .dwg o .dxf', 'error'); return; }
+
+  DOM.emptyState.classList.add('hidden');
+  DOM.loadingOverlay.classList.add('activo');
+  DOM.loadingLabel.textContent = 'Preparando…';
+  DOM.loadingSub.textContent = 'La primera vez puede tardar.';
+
+  DOM.btnOpen.disabled = true; DOM.btnPdf.disabled = true;
+  DOM.btnZoomIn.disabled = true; DOM.btnZoomOut.disabled = true;
+  DOM.btnFit.disabled = true; DOM.btnClickHide.disabled = true;
+  setStatus('Procesando ' + file.name);
+
+  try {
+    let dxfText;
+    if (isDwg) {
+      if (!wasmReady) { await dwgInit({ wasmBase: CDN_WASM_BASE }); wasmReady = true; }
+      DOM.loadingLabel.textContent = 'Leyendo DWG…';
+      const buf = await file.arrayBuffer();
+      DOM.loadingLabel.textContent = 'Convirtiendo a DXF…';
+      const bytes = await convertDwgToDxf(new Uint8Array(buf));
+      dxfText = new TextDecoder().decode(bytes);
+    } else {
+      DOM.loadingLabel.textContent = 'Leyendo DXF…';
+      dxfText = await file.text();
+    }
+
+    DOM.loadingLabel.textContent = 'Parseando capas…';
+    const layersRaw = parseLayersTable(dxfText);
+
+    DOM.loadingLabel.textContent = 'Parseando entidades…';
+    const parsed = parseEntities(dxfText, '0');
+
+    state.layers.clear();
+    const usedLayers = new Set();
+    for (const s of parsed.segments) usedLayers.add(s.layerName);
+    for (const l of layersRaw.keys()) usedLayers.add(l);
+    for (const name of usedLayers) {
+      const info = layersRaw.get(name);
+      const aci = info?.aci ?? 7;
+      const lw = info?.lineweight ?? -3;
+      state.layers.set(name, {
+        color: aciToHex(aci, 7),
+        lineweight: lw,
+        aci,
+        visible: true,
+      });
+    }
+
+    state.segments = parsed.segments;
+    state.snapPoints = parsed.snapPoints;
+    state.texts = parsed.texts;
+    state.bounds = computeBounds(parsed.segments, parsed.texts);
+
+    measureHistory = [];
+    measureHistorySeq = 0;
+    renderMeasureHistoryList();
+    if (measureMode) exitMeasureMode();
+
+    DOM.loadingLabel.textContent = 'Renderizando…';
+    initThree();
+    buildSceneFromSegments();
+
+    layerHistory.length = 0;
+    updateUndoUI();
+
+    renderLayers();
+
+    if (state.bounds) fitView();
+
+    stats.fileSize = file.size;
+    stats.fileName = file.name;
+    DOM.fileName.textContent = file.name;
+    DOM.fileName.title = file.name;
+    DOM.fileSize.textContent = fmtBytes(file.size);
+    stats.entityCount = parsed.segments.length;
+    DOM.entCount.textContent = stats.entityCount.toLocaleString('es');
+    DOM.sectionFile.style.display = '';
+
+    if (state.bounds) {
+      const w = state.bounds.maxX - state.bounds.minX;
+      const h = state.bounds.maxY - state.bounds.minY;
+      DOM.extentsRow.style.display = '';
+      DOM.extentsVal.textContent = `${fmtNum(w)} × ${fmtNum(h)} m`;
+    }
+
+    DOM.btnPdf.disabled = false;
+    DOM.btnZoomIn.disabled = false;
+    DOM.btnZoomOut.disabled = false;
+    DOM.btnFit.disabled = false;
+    DOM.btnClickHide.disabled = state.layers.size === 0;
+
+    setStatus(`Listo · ${stats.entityCount.toLocaleString('es')} segmentos · ${state.layers.size} capas`);
+    notificar('Dibujo cargado');
+  } catch (err) {
+    console.error(err);
+    notificar('Error: ' + (err.message || err), 'error');
+    setStatus('Error');
+    DOM.emptyState.classList.remove('hidden');
+  } finally {
+    DOM.loadingOverlay.classList.remove('activo');
+    DOM.btnOpen.disabled = false;
   }
 }
 
-DOM.btnPdf.addEventListener('click', (e) => { e.stopPropagation(); if (DOM.btnPdf.disabled) return; DOM.pdfMenu.classList.toggle('activo'); });
+/* ============================================================
+   FILE INPUT / DRAG & DROP
+============================================================ */
+function openFileDialog() { DOM.fileInput.click(); }
+DOM.btnOpen.addEventListener('click', openFileDialog);
+DOM.btnOpenEmpty.addEventListener('click', openFileDialog);
+DOM.fileInput.addEventListener('change', (e) => {
+  const f = e.target.files?.[0];
+  if (f) processFile(f);
+  e.target.value = '';
+});
+
+let dragCounter = 0;
+['dragenter', 'dragover'].forEach(ev => {
+  window.addEventListener(ev, (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+      dragCounter++;
+      DOM.dragOverlay.classList.add('activo');
+    }
+  });
+});
+['dragleave', 'drop'].forEach(ev => {
+  window.addEventListener(ev, (e) => {
+    e.preventDefault();
+    if (ev === 'dragleave') {
+      dragCounter = Math.max(0, dragCounter - 1);
+      if (dragCounter === 0) DOM.dragOverlay.classList.remove('activo');
+    } else {
+      dragCounter = 0;
+      DOM.dragOverlay.classList.remove('activo');
+    }
+  });
+});
+window.addEventListener('drop', (e) => {
+  const f = e.dataTransfer?.files?.[0];
+  if (f) processFile(f);
+});
+
+/* ============================================================
+   EVENTOS GENERALES
+============================================================ */
+DOM.btnMeasure.addEventListener('click', () => { if (measureMode) exitMeasureMode(); else enterMeasureMode(); });
+DOM.btnMeasureClose.addEventListener('click', () => exitMeasureMode());
+DOM.btnMeasureClearHistory.addEventListener('click', () => {
+  measureHistory = [];
+  renderMeasureHistoryList();
+  drawMeasurePreview();
+});
+
+document.querySelectorAll('.measure-tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.measure-tool-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    measureTool = btn.dataset.tool;
+    clearMeasure();
+    updateMeasureHint();
+  });
+});
+document.querySelectorAll('.snap-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const snap = btn.dataset.snap;
+    if (measureSnaps.has(snap)) { measureSnaps.delete(snap); btn.classList.remove('active'); }
+    else { measureSnaps.add(snap); btn.classList.add('active'); }
+  });
+});
+
+DOM.btnZoomIn.addEventListener('click', () => { if (!DOM.btnZoomIn.disabled) zoomIn(); });
+DOM.btnZoomOut.addEventListener('click', () => { if (!DOM.btnZoomOut.disabled) zoomOut(); });
+DOM.btnFit.addEventListener('click', () => { if (!DOM.btnFit.disabled) fitView(); });
+
+DOM.btnGrid.addEventListener('click', () => {
+  if (!gridHelper) return;
+  gridHelper.visible = !gridHelper.visible;
+  DOM.btnGrid.classList.toggle('active', gridHelper.visible);
+  render();
+});
+
+DOM.lwSlider.addEventListener('input', () => {
+  state.widthScale = parseFloat(DOM.lwSlider.value);
+  DOM.lwValue.textContent = state.widthScale.toFixed(1) + '×';
+  applyWidthScale();
+});
+
+DOM.btnSidebarToggle.addEventListener('click', () => {
+  DOM.sidePanel.classList.toggle('colapsado');
+  setTimeout(() => {
+    resizeRenderer();
+    drawMeasurePreview();
+  }, 240);
+});
+if (window.innerWidth <= 900) DOM.sidePanel.classList.add('colapsado');
+
+DOM.infoFab.addEventListener('click', (e) => { e.stopPropagation(); DOM.infoCard.classList.toggle('activo'); });
+document.addEventListener('click', (e) => {
+  if (!DOM.infoCard.classList.contains('activo')) return;
+  if (DOM.infoCard.contains(e.target) || DOM.infoFab.contains(e.target)) return;
+  DOM.infoCard.classList.remove('activo');
+});
+
+DOM.btnPdf.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (DOM.btnPdf.disabled) return;
+  DOM.pdfMenu.classList.toggle('activo');
+});
 document.addEventListener('click', (e) => {
   if (!DOM.pdfMenu.classList.contains('activo')) return;
   if (DOM.pdfMenu.contains(e.target) || DOM.btnPdf.contains(e.target)) return;
@@ -2274,161 +2666,165 @@ document.addEventListener('click', (e) => {
 DOM.pdfOptVisible.addEventListener('click', () => { DOM.pdfMenu.classList.remove('activo'); generatePdfVectorial(null); });
 DOM.pdfOptArea.addEventListener('click', () => { DOM.pdfMenu.classList.remove('activo'); enterPdfAreaMode(); });
 
-function enterPdfAreaMode() {
-  if (clickHideMode) { clickHideMode = false; DOM.btnClickHide.classList.remove('active', 'active-danger'); DOM.canvasContainer.classList.remove('mode-clickhide'); }
-  if (measureMode) exitMeasureMode();
-  pdfAreaMode = true;
-  DOM.canvasContainer.classList.add('mode-pdfarea');
-  notificar('Arrastrá un rectángulo sobre el plano para exportar ese sector');
-}
-function exitPdfAreaMode() { pdfAreaMode = false; DOM.canvasContainer.classList.remove('mode-pdfarea'); }
+DOM.viewerContainer.addEventListener('mousemove', (e) => {
+  mouseScreen = { x: e.clientX, y: e.clientY };
 
-async function processFile(file) {
-  if (!file) return;
-  const isDwg = /\.dwg$/i.test(file.name);
-  const isDxf = /\.dxf$/i.test(file.name);
-  if (!isDwg && !isDxf) { notificar('El archivo debe ser .dwg o .dxf', 'error'); return; }
+  if (state.bounds) {
+    const w = screenToWorld(e.clientX, e.clientY);
+    DOM.statusCoords.style.display = '';
+    DOM.statusX.textContent = `X: ${fmtNum(w.x)} m`;
+    DOM.statusY.textContent = `Y: ${fmtNum(w.y)} m`;
+  }
 
-  DOM.emptyState.classList.add('hidden');
-  DOM.loadingOverlay.classList.add('activo');
-  DOM.loadingLabel.textContent = 'Preparando motor…';
-  DOM.loadingSub.textContent = 'La primera vez puede tardar unos segundos.';
-  DOM.btnOpen.disabled = true; DOM.btnPdf.disabled = true;
-  DOM.btnZoomIn.disabled = true; DOM.btnZoomOut.disabled = true;
-  DOM.btnFit.disabled = true; DOM.btnRegen.disabled = true;
-  DOM.btnClickHide.disabled = true;
-  setStatus('Procesando ' + file.name);
+  if (!measureMode) return;
 
-  const safetyTimeout = setTimeout(() => {
-    DOM.loadingOverlay.classList.remove('activo');
-    DOM.btnOpen.disabled = false;
-    notificar('La carga está tardando demasiado.', 'warn');
-  }, 90000);
+  const snap = findSnapPoint(e.clientX, e.clientY);
+  if (snap) {
+    lastSnapPoint = snap;
+    const sp = worldToScreen(snap.x, snap.y);
+    DOM.snapMarker.classList.remove('oculto');
+    DOM.snapMarker.style.left = sp.x + 'px';
+    DOM.snapMarker.style.top = sp.y + 'px';
+    DOM.snapMarker.setAttribute('data-type', snap.type);
+    DOM.snapMarkerLabel.textContent = SNAP_LABELS[snap.type] || snap.type;
+  } else {
+    lastSnapPoint = null;
+    DOM.snapMarker.classList.add('oculto');
+  }
+  drawMeasurePreview();
+  if (measurePoints.length > 0) updateMeasureResultLive();
+});
 
-  let fonts = [];
-  try {
-    let dxfText;
-    if (isDwg) {
-      if (!wasmReady) { await init({ wasmBase: CDN_WASM_BASE }); wasmReady = true; }
-      DOM.loadingLabel.textContent = 'Leyendo archivo DWG…';
-      const buf = await file.arrayBuffer();
-      DOM.loadingLabel.textContent = 'Convirtiendo DWG a DXF…';
-      const dxfBytes = await convertDwgToDxf(new Uint8Array(buf));
-      dxfText = new TextDecoder().decode(dxfBytes);
-    } else {
-      DOM.loadingLabel.textContent = 'Leyendo archivo DXF…';
-      dxfText = await file.text();
+DOM.viewerContainer.addEventListener('mouseleave', () => {
+  DOM.statusCoords.style.display = 'none';
+});
+
+DOM.viewerContainer.addEventListener('click', (e) => {
+  if (!measureMode) return;
+  if (e.pointerType === 'touch') return;
+  e.stopPropagation(); e.preventDefault();
+
+  const snap = findSnapPoint(e.clientX, e.clientY);
+  let worldPoint;
+  if (snap) worldPoint = { x: snap.x, y: snap.y, z: 0 };
+  else worldPoint = screenToWorld(e.clientX, e.clientY);
+
+  measurePoints.push(worldPoint);
+  updateMeasureResult();
+
+  if (measureTool === 'distance' && measurePoints.length === 2) {
+    finishCurrentMeasurement();
+  } else if (measureTool === 'angle' && measurePoints.length === 3) {
+    finishCurrentMeasurement();
+  } else {
+    drawMeasurePreview();
+  }
+}, true);
+
+DOM.viewerContainer.addEventListener('dblclick', (e) => {
+  if (!measureMode) return;
+  if (measureTool === 'polyline' || measureTool === 'area') {
+    e.stopPropagation(); e.preventDefault();
+    if (measurePoints.length > 2) {
+      const p1 = measurePoints[measurePoints.length - 1];
+      const p2 = measurePoints[measurePoints.length - 2];
+      if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1e-9) measurePoints.pop();
     }
-    rawDxfText = dxfText;
+    updateMeasureResult();
+    finishCurrentMeasurement();
+  }
+});
 
-    const measureGeo = buildMeasureGeometry(dxfText);
-    snapPoints = measureGeo.snapPoints;
-    lineSegments = measureGeo.segments;
-    textEntities = measureGeo.texts || [];
-    measureHistory = [];
-    measureHistorySeq = 0;
-    renderMeasureHistoryList();
-    if (measureMode) exitMeasureMode();
+function updateMeasureResultLive() {
+  const n = measurePoints.length;
+  if (n === 0) return;
+  const last = measurePoints[n - 1];
+  let curPoint = null;
+  if (lastSnapPoint) curPoint = { x: lastSnapPoint.x, y: lastSnapPoint.y };
+  else curPoint = screenToWorld(mouseScreen.x, mouseScreen.y);
+  if (!curPoint) return;
 
-    DOM.loadingLabel.textContent = 'Cargando tipografías…';
-    fonts = await getFonts();
-
-    DOM.loadingLabel.textContent = 'Renderizando dibujo…';
-    initViewer();
-
-    const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
-    const dxfUrl = URL.createObjectURL(dxfBlob);
-    const loadOpts = { url: dxfUrl };
-    if (fonts.length > 0) loadOpts.fonts = fonts;
-    await viewer.Load(loadOpts);
-    URL.revokeObjectURL(dxfUrl);
-
-    clearTimeout(safetyTimeout);
-    setTimeout(configureMouseControls, 200);
-
-    layersState.clear();
-    layerHistory.length = 0;
-    updateUndoUI();
-    try { for (const L of viewer.GetLayers()) { if (!L || typeof L.name !== 'string') continue; layersState.set(L.name, { color: L.color, visible: true }); } } catch (e) {}
-    syncLayersStateFromScene();
-    renderLayers();
-
-    stats.fileSize = file.size; stats.fileName = file.name;
-    DOM.fileName.textContent = file.name; DOM.fileName.title = file.name;
-    DOM.fileSize.textContent = fmtBytes(file.size);
-    const entMatch = rawDxfText.match(/\n\s*0\s*\n/g);
-    stats.entityCount = entMatch ? entMatch.length : 0;
-    DOM.entCount.textContent = stats.entityCount.toLocaleString('es');
-    DOM.sectionFile.style.display = '';
-
-    const bounds = viewer.GetBounds();
-    if (bounds) {
-      const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
-      DOM.extentsRow.style.display = '';
-      DOM.extentsVal.textContent = `${fmtNum(w)} × ${fmtNum(h)} m`;
+  if (measureTool === 'distance' && n === 1) {
+    const d = dist2d(measurePoints[0], curPoint);
+    const dx = curPoint.x - measurePoints[0].x, dy = curPoint.y - measurePoints[0].y;
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    DOM.measureResult.innerHTML = `<span class="mr-label">Distancia:</span> <span class="mr-value">${d.toFixed(3)} m</span><br><span class="mr-label">ΔX:</span> ${dx.toFixed(3)} m · <span class="mr-label">ΔY:</span> ${dy.toFixed(3)} m<br><span class="mr-label">Ángulo:</span> ${ang.toFixed(2)}°`;
+  } else if (measureTool === 'polyline' && n >= 1) {
+    let total = 0;
+    for (let i = 0; i < n - 1; i++) total += dist2d(measurePoints[i], measurePoints[i + 1]);
+    total += dist2d(last, curPoint);
+    DOM.measureResult.innerHTML = `<span class="mr-label">Longitud total:</span> <span class="mr-value">${total.toFixed(3)} m</span><br><span class="mr-label">Vértices:</span> ${n} (+ cursor)`;
+  } else if (measureTool === 'area' && n >= 1) {
+    const pts = [...measurePoints, curPoint];
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) { const j = (i + 1) % pts.length; area += pts[i].x * pts[j].y - pts[j].x * pts[i].y; }
+    area = Math.abs(area) / 2;
+    let perim = 0;
+    for (let i = 0; i < pts.length; i++) { const j = (i + 1) % pts.length; perim += dist2d(pts[i], pts[j]); }
+    DOM.measureResult.innerHTML = `<span class="mr-label">Área (prelim):</span> <span class="mr-value">${area.toFixed(3)} m²</span><br><span class="mr-label">Perímetro:</span> ${perim.toFixed(3)} m`;
+  } else if (measureTool === 'angle' && n >= 1) {
+    if (n === 2) {
+      const v1 = { x: measurePoints[0].x - measurePoints[1].x, y: measurePoints[0].y - measurePoints[1].y };
+      const v2 = { x: curPoint.x - measurePoints[1].x, y: curPoint.y - measurePoints[1].y };
+      const dot = v1.x * v2.x + v1.y * v2.y;
+      const mag1 = Math.hypot(v1.x, v1.y), mag2 = Math.hypot(v2.x, v2.y);
+      const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+      const ang = Math.acos(cos) * 180 / Math.PI;
+      DOM.measureResult.innerHTML = `<span class="mr-label">Ángulo:</span> <span class="mr-value">${ang.toFixed(3)}°</span>`;
     }
-
-    DOM.btnPdf.disabled = false; DOM.btnZoomIn.disabled = false;
-    DOM.btnZoomOut.disabled = false; DOM.btnFit.disabled = false;
-    DOM.btnRegen.disabled = false;
-    setStatus(`Listo · ${stats.entityCount.toLocaleString('es')} entidades · ${layersState.size} capas`);
-    notificar('Dibujo cargado correctamente');
-    if (fonts.length === 0) notificar('No se pudieron cargar tipografías: los textos no se mostrarán', 'warn');
-  } catch (err) {
-    console.error(err);
-    notificar('Error al procesar el archivo: ' + (err.message || err), 'error');
-    setStatus('Error al procesar el archivo');
-    DOM.emptyState.classList.remove('hidden');
-  } finally {
-    clearTimeout(safetyTimeout);
-    DOM.loadingOverlay.classList.remove('activo');
-    DOM.btnOpen.disabled = false;
   }
 }
 
-function openFileDialog() { DOM.fileInput.click(); }
-DOM.btnOpen.addEventListener('click', openFileDialog);
-DOM.btnOpenEmpty.addEventListener('click', openFileDialog);
-DOM.fileInput.addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) processFile(f); e.target.value = ''; });
-
-let dragCounter = 0;
-['dragenter', 'dragover'].forEach(ev => { window.addEventListener(ev, (e) => { e.preventDefault(); if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) { dragCounter++; DOM.dragOverlay.classList.add('activo'); } }); });
-['dragleave', 'drop'].forEach(ev => { window.addEventListener(ev, (e) => { e.preventDefault(); if (ev === 'dragleave') { dragCounter = Math.max(0, dragCounter - 1); if (dragCounter === 0) DOM.dragOverlay.classList.remove('activo'); } else { dragCounter = 0; DOM.dragOverlay.classList.remove('activo'); } }); });
-window.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) processFile(f); });
-
-DOM.btnSidebarToggle.addEventListener('click', () => { DOM.sidePanel.classList.toggle('colapsado'); setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 240); });
-if (window.innerWidth <= 900) DOM.sidePanel.classList.add('colapsado');
-
-DOM.infoFab.addEventListener('click', (e) => { e.stopPropagation(); DOM.infoCard.classList.toggle('activo'); });
-document.addEventListener('click', (e) => { if (!DOM.infoCard.classList.contains('activo')) return; if (DOM.infoCard.contains(e.target) || DOM.infoFab.contains(e.target)) return; DOM.infoCard.classList.remove('activo'); });
-
+// Teclado
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); if (undoLayerChange()) notificar('Cambio de capa deshecho'); else notificar('Nada para deshacer', 'warn'); return; }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); return; }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    if (undoLayerChange()) notificar('Cambio deshecho');
+    else notificar('Nada para deshacer', 'warn');
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); openFileDialog(); return; }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); if (!DOM.btnPdf.disabled) { DOM.pdfMenu.classList.remove('activo'); generatePdfVectorial(null); } return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+    e.preventDefault();
+    if (!DOM.btnPdf.disabled) generatePdfVectorial(null);
+    return;
+  }
   if (e.ctrlKey || e.metaKey) return;
   if (e.key === 'Escape') {
-    DOM.infoCard.classList.remove('activo'); DOM.pdfMenu.classList.remove('activo');
+    DOM.infoCard.classList.remove('activo');
+    DOM.pdfMenu.classList.remove('activo');
     if (clickHideMode) { clickHideMode = false; DOM.btnClickHide.classList.remove('active', 'active-danger'); DOM.canvasContainer.classList.remove('mode-clickhide'); }
     if (pdfAreaMode) exitPdfAreaMode();
-    if (measureMode) {
-      if (measurePoints.length > 0 && (measureTool === 'polyline' || measureTool === 'area')) { updateMeasureResult(); drawMeasurePreview(); }
-      else { exitMeasureMode(); }
-    }
+    if (measureMode) exitMeasureMode();
   }
-  if (e.key.toLowerCase() === 'g') { gridVisible = !gridVisible; applyGrid(); }
+  if (e.key.toLowerCase() === 'g') DOM.btnGrid.click();
   if (e.key.toLowerCase() === 'h') { if (!DOM.btnClickHide.disabled) DOM.btnClickHide.click(); }
   if (e.key.toLowerCase() === 'f') { if (!DOM.btnFit.disabled) fitView(); }
-  if (e.key.toLowerCase() === 'r') { if (!DOM.btnRegen.disabled) regen(); }
   if (e.key.toLowerCase() === 'm') { if (measureMode) exitMeasureMode(); else enterMeasureMode(); }
   if (e.key === '+' || e.key === '=') { if (!DOM.btnZoomIn.disabled) zoomIn(); }
   if (e.key === '-' || e.key === '_') { if (!DOM.btnZoomOut.disabled) zoomOut(); }
 });
 
-window.addEventListener('resize', () => { setTimeout(() => drawMeasurePreview(), 50); });
+try {
+  const ro = new ResizeObserver(() => {
+    resizeRenderer();
+    drawMeasurePreview();
+  });
+  ro.observe(DOM.viewerContainer);
+} catch (e) {}
 
+window.addEventListener('resize', () => {
+  resizeRenderer();
+  drawMeasurePreview();
+});
+
+/* ============================================================
+   INIT
+============================================================ */
+attachMouseControls();
+attachTouchControls();
+DOM.lwValue.textContent = state.widthScale.toFixed(1) + '×';
 updateUndoUI();
 </script>
 </body>
