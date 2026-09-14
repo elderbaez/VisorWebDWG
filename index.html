@@ -2,7 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1b1b1b">
 <title>Visor web DWG/DXF</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,21 +26,36 @@
   --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
+html, body {
+  height: 100%;
+  height: 100dvh;
+}
 body {
   font-family: var(--font); background-color: var(--bg); color: var(--text-main);
-  overflow: hidden; height: 100vh; width: 100vw;
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
   -webkit-font-smoothing: antialiased; user-select: none;
+  overscroll-behavior: none;
 }
 .side-panel::-webkit-scrollbar { width: 6px; }
 .side-panel::-webkit-scrollbar-track { background: transparent; }
 .side-panel::-webkit-scrollbar-thumb { background: rgba(139,148,158,0.28); border-radius: 3px; }
 
-#pantalla-visor { display: flex; flex-direction: column; height: 100vh; width: 100vw; background: var(--bg); position: relative; }
+#pantalla-visor {
+  display: flex; flex-direction: column;
+  height: 100vh; height: 100dvh;
+  width: 100%; background: var(--bg); position: relative;
+}
 
 .viewer-top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0.75rem 1.25rem; background: var(--panel); border-bottom: 1px solid var(--border);
+  padding: calc(0.75rem + env(safe-area-inset-top, 0px))
+           calc(1.25rem + env(safe-area-inset-right, 0px))
+           0.75rem
+           calc(1.25rem + env(safe-area-inset-left, 0px));
+  background: var(--panel); border-bottom: 1px solid var(--border);
   z-index: 50; flex-shrink: 0;
 }
 .app-title { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; color: var(--text-main); }
@@ -410,10 +429,14 @@ body {
 .info-link.whatsapp .info-link-label small { color: #25D366; opacity: 0.85; }
 
 .viewer-status-bar {
-  height: 34px; background: var(--panel); border-top: 1px solid var(--border);
+  min-height: 30px;
+  background: var(--panel); border-top: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 1rem; font-size: 0.72rem; font-weight: 500;
-  color: var(--text-secondary); z-index: 50; flex-shrink: 0;
+  padding: 0.15rem calc(1rem + env(safe-area-inset-right, 0px))
+           calc(0.15rem + env(safe-area-inset-bottom, 0px))
+           calc(1rem + env(safe-area-inset-left, 0px));
+  font-size: 0.725rem; font-weight: 500; color: var(--text-secondary);
+  z-index: 50; flex-shrink: 0; position: relative;
 }
 .status-left { display: flex; gap: 1.5rem; align-items: center; overflow: hidden; min-width: 0; }
 .status-left span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -450,6 +473,41 @@ body {
 .notificacion.warn { background: var(--warning); color: #1a1a1a; }
 @keyframes slideUp { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
+/* ============ MODO TRACKPAD TÁCTIL ============ */
+.canvas-container.modo-trackpad #viewer-container { touch-action: none !important; }
+.canvas-container.modo-trackpad { touch-action: none !important; }
+
+.trackpad-cursor {
+  position: fixed; width: 34px; height: 34px;
+  pointer-events: none; z-index: 9997;
+  transform: translate(-50%, -50%);
+  display: none;
+}
+.canvas-container.modo-trackpad .trackpad-cursor { display: block; }
+
+.trackpad-hint {
+  position: absolute; left: 50%; bottom: 1rem;
+  transform: translateX(-50%);
+  padding: 0.4rem 0.85rem;
+  background: rgba(22, 27, 34, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-family: var(--font);
+  font-size: 0.68rem; font-weight: 600;
+  color: var(--text-secondary);
+  z-index: 1500; pointer-events: none;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  opacity: 0; transition: opacity 0.3s;
+}
+.trackpad-hint.activo { opacity: 1; }
+.trackpad-hint b { color: var(--accent); }
+
+.cad-tool-btn.active-trackpad {
+  background: var(--warning) !important;
+  color: #111 !important; font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .btn-sidebar-toggle { display: inline-flex; }
   .side-panel {
@@ -459,13 +517,24 @@ body {
     width: 280px;
   }
   .side-panel.colapsado { transform: translateX(-100%); margin-left: 0; }
-  .viewer-top-bar { padding: 0.55rem 0.75rem; gap: 0.4rem; }
+  .viewer-top-bar {
+    padding: calc(0.55rem + env(safe-area-inset-top, 0px))
+             calc(0.75rem + env(safe-area-inset-right, 0px))
+             0.55rem
+             calc(0.75rem + env(safe-area-inset-left, 0px));
+    gap: 0.4rem;
+  }
   .app-title { font-size: 0.9rem; gap: 0.4rem; }
   .app-subtitle { display: none; }
   .btn span.btn-label { display: none; }
   .btn { padding: 0.45rem 0.6rem; }
   .viewer-actions { gap: 0.35rem; }
-  .viewer-status-bar { padding: 0 0.5rem; font-size: 0.65rem; }
+  .viewer-status-bar {
+    padding: 0.15rem calc(0.5rem + env(safe-area-inset-right, 0px))
+             calc(0.15rem + env(safe-area-inset-bottom, 0px))
+             calc(0.5rem + env(safe-area-inset-left, 0px));
+    font-size: 0.65rem;
+  }
   .status-left { gap: 0.75rem; }
   .cad-tool-btn span:not(.badge) { display: none; }
   .cad-tool-btn { padding: 4px 6px; }
@@ -559,6 +628,21 @@ body {
         <div class="grid-overlay" id="gridOverlay"></div>
 
         <div class="snap-marker oculto" id="snapMarker"><span class="snap-marker-label" id="snapMarkerLabel"></span></div>
+
+        <div class="trackpad-cursor" id="trackpadCursor">
+          <svg width="34" height="34" viewBox="0 0 34 34" style="pointer-events:none;">
+            <circle cx="17" cy="17" r="7" fill="none" stroke="#f2994a" stroke-width="2"/>
+            <circle cx="17" cy="17" r="1.8" fill="#f2994a"/>
+            <line x1="17" y1="0" x2="17" y2="9" stroke="#f2994a" stroke-width="1.6"/>
+            <line x1="17" y1="25" x2="17" y2="34" stroke="#f2994a" stroke-width="1.6"/>
+            <line x1="0" y1="17" x2="9" y2="17" stroke="#f2994a" stroke-width="1.6"/>
+            <line x1="25" y1="17" x2="34" y2="17" stroke="#f2994a" stroke-width="1.6"/>
+          </svg>
+        </div>
+
+        <div class="trackpad-hint" id="trackpadHint">
+          <b>1 dedo</b> mueve el cursor · <b>Tap</b> = clic · <b>2 dedos</b> pan/zoom
+        </div>
 
         <div class="measure-panel" id="measurePanel">
           <div class="measure-header">
@@ -685,6 +769,15 @@ body {
       </span>
     </div>
     <div class="status-right">
+      <button class="cad-tool-btn" id="btnToggleTrackpad" title="Modo Trackpad (táctil)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" width="14" height="14">
+          <rect x="4" y="3" width="16" height="18" rx="2"/>
+          <line x1="12" y1="16" x2="12" y2="17.5"/>
+          <line x1="8" y1="6" x2="16" y2="6"/>
+          <line x1="8" y1="9" x2="16" y2="9"/>
+        </svg> <span>Trackpad</span>
+      </button>
+      <div class="status-divider"></div>
       <button class="cad-tool-btn" id="btnZoomIn" title="Acercar" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
       </button>
@@ -1828,6 +1921,7 @@ function enterMeasureMode() {
   DOM.canvasContainer.classList.add('mode-measure');
   DOM.btnMeasure.classList.add('active');
   clearMeasure();
+  if (esTouch && !trackpadActivo) activarTrackpad(true);
   notificar('Modo medición activo. Elegí una herramienta y hacé clic.');
 }
 function exitMeasureMode() {
@@ -2034,7 +2128,10 @@ DOM.btnClickHide.addEventListener('click', () => {
   DOM.btnClickHide.classList.toggle('active', clickHideMode);
   DOM.btnClickHide.classList.toggle('active-danger', clickHideMode);
   DOM.canvasContainer.classList.toggle('mode-clickhide', clickHideMode);
-  if (clickHideMode) notificar('Clic sobre un objeto o arrastrá un cuadro para apagar su capa');
+  if (clickHideMode) {
+    if (esTouch && !trackpadActivo) activarTrackpad(true);
+    notificar('Clic sobre un objeto o arrastrá un cuadro para apagar su capa');
+  }
 });
 
 let selState = null, selRectEl = null;
@@ -2106,6 +2203,48 @@ document.addEventListener('pointerup', (e) => {
     notificar(`${changes.length} capa(s) apagada(s)`);
   }
 }, true);
+
+function pickLayersInBox(x1, y1, x2, y2) {
+  if (!viewer) return [];
+  const scene = viewer.GetScene();
+  const camera = viewer.GetCamera();
+  const canvas = viewer.GetCanvas();
+  if (!scene || !camera || !canvas) return [];
+  try { scene.updateMatrixWorld(true); } catch (e) {}
+  const rect = canvas.getBoundingClientRect();
+  const bx1 = Math.min(x1, x2) - rect.left, bx2 = Math.max(x1, x2) - rect.left;
+  const by1 = Math.min(y1, y2) - rect.top,  by2 = Math.max(y1, y2) - rect.top;
+  const layers = new Set();
+  const halfW = rect.width * 0.5, halfH = rect.height * 0.5;
+  const v = new THREE.Vector3();
+  const MAX_SAMPLES = 8000;
+  const visit = (obj) => {
+    if (!obj) return;
+    let anc = obj, visible = true;
+    while (anc && anc !== scene) { if (anc.visible === false) { visible = false; break; } anc = anc.parent; }
+    if (!visible) return;
+    const geom = obj.geometry;
+    const pos = geom && geom.attributes && geom.attributes.position;
+    if (pos && pos.count > 0) {
+      const m = obj.matrixWorld;
+      const count = pos.count;
+      const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
+      for (let i = 0; i < count; i += vStep) {
+        v.fromBufferAttribute(pos, i); v.applyMatrix4(m); v.project(camera);
+        if (v.z > 1) continue;
+        const sx = (v.x + 1) * halfW, sy = (-v.y + 1) * halfH;
+        if (sx >= bx1 && sx <= bx2 && sy >= by1 && sy <= by2) {
+          const lname = getLayerNameFromObject(obj);
+          if (lname) layers.add(lname);
+          break;
+        }
+      }
+    }
+    if (obj.children) for (const c of obj.children) visit(c);
+  };
+  for (const c of scene.children) visit(c);
+  return [...layers];
+}
 
 /* ============================================================
    PDF — jsPDF + svg2pdf (2.x) unificados
@@ -2279,6 +2418,7 @@ function enterPdfAreaMode() {
   if (measureMode) exitMeasureMode();
   pdfAreaMode = true;
   DOM.canvasContainer.classList.add('mode-pdfarea');
+  if (esTouch && !trackpadActivo) activarTrackpad(true);
   notificar('Arrastrá un rectángulo sobre el plano para exportar ese sector');
 }
 function exitPdfAreaMode() { pdfAreaMode = false; DOM.canvasContainer.classList.remove('mode-pdfarea'); }
@@ -2297,6 +2437,7 @@ async function processFile(file) {
   DOM.btnZoomIn.disabled = true; DOM.btnZoomOut.disabled = true;
   DOM.btnFit.disabled = true; DOM.btnRegen.disabled = true;
   DOM.btnClickHide.disabled = true;
+  if (DOM_T.btn) DOM_T.btn.disabled = true;
   setStatus('Procesando ' + file.name);
 
   const safetyTimeout = setTimeout(() => {
@@ -2371,6 +2512,7 @@ async function processFile(file) {
     DOM.btnPdf.disabled = false; DOM.btnZoomIn.disabled = false;
     DOM.btnZoomOut.disabled = false; DOM.btnFit.disabled = false;
     DOM.btnRegen.disabled = false;
+    if (DOM_T.btn) DOM_T.btn.disabled = false;
     setStatus(`Listo · ${stats.entityCount.toLocaleString('es')} entidades · ${layersState.size} capas`);
     notificar('Dibujo cargado correctamente');
     if (fonts.length === 0) notificar('No se pudieron cargar tipografías: los textos no se mostrarán', 'warn');
@@ -2430,6 +2572,222 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('resize', () => { setTimeout(() => drawMeasurePreview(), 50); });
 
 updateUndoUI();
+
+/* ============================================================
+   MODO TRACKPAD TÁCTIL (adaptado a Three.js / DxfViewer)
+============================================================ */
+const esTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+let trackpadActivo = false;
+let trackpadCursorPx = { x: 0, y: 0 };
+let touchFingers = new Map();
+let touchTwoFinger = null;
+let touchActiveId = null;
+let trackpadHintTimeout = null;
+
+const DOM_T = {
+  cursor: document.getElementById('trackpadCursor'),
+  hint: document.getElementById('trackpadHint'),
+  btn: document.getElementById('btnToggleTrackpad'),
+};
+
+function mostrarHintTrackpad(ms = 3500) {
+  if (!DOM_T.hint) return;
+  DOM_T.hint.classList.add('activo');
+  if (trackpadHintTimeout) clearTimeout(trackpadHintTimeout);
+  trackpadHintTimeout = setTimeout(() => DOM_T.hint.classList.remove('activo'), ms);
+}
+
+function posicionarCursorTrackpad() {
+  if (!DOM_T.cursor) return;
+  const rect = DOM.canvasContainer.getBoundingClientRect();
+  trackpadCursorPx.x = Math.max(2, Math.min(rect.width - 2, trackpadCursorPx.x));
+  trackpadCursorPx.y = Math.max(2, Math.min(rect.height - 2, trackpadCursorPx.y));
+  DOM_T.cursor.style.left = (rect.left + trackpadCursorPx.x) + 'px';
+  DOM_T.cursor.style.top  = (rect.top  + trackpadCursorPx.y) + 'px';
+  // Emular mousemove sobre el canvas para que el snap de medición se actualice
+  const clientX = rect.left + trackpadCursorPx.x;
+  const clientY = rect.top  + trackpadCursorPx.y;
+  mouseScreen = { x: clientX, y: clientY };
+  if (measureMode) {
+    const snap = findSnapPoint(clientX, clientY);
+    if (snap) {
+      lastSnapPoint = snap;
+      DOM.snapMarker.classList.remove('oculto');
+      DOM.snapMarker.style.left = snap.screenX + 'px';
+      DOM.snapMarker.style.top  = snap.screenY + 'px';
+      DOM.snapMarker.setAttribute('data-type', snap.type);
+      DOM.snapMarkerLabel.textContent = SNAP_LABELS[snap.type] || snap.type;
+    } else {
+      lastSnapPoint = null;
+      DOM.snapMarker.classList.add('oculto');
+    }
+    drawMeasurePreview();
+    if (measurePoints.length > 0) updateMeasureResultLive();
+  }
+}
+
+function activarTrackpad(silencioso = false) {
+  if (trackpadActivo) return;
+  trackpadActivo = true;
+  DOM.canvasContainer.classList.add('modo-trackpad');
+  const rect = DOM.canvasContainer.getBoundingClientRect();
+  trackpadCursorPx.x = rect.width / 2;
+  trackpadCursorPx.y = rect.height / 2;
+  posicionarCursorTrackpad();
+  if (DOM_T.btn) DOM_T.btn.classList.add('active-trackpad');
+  if (!silencioso) {
+    notificar('Modo Trackpad ON · 1 dedo cursor · Tap clic · 2 dedos pan/zoom');
+    mostrarHintTrackpad(4500);
+  }
+}
+
+function desactivarTrackpad(silencioso = false) {
+  if (!trackpadActivo) return;
+  trackpadActivo = false;
+  DOM.canvasContainer.classList.remove('modo-trackpad');
+  touchFingers.clear();
+  touchTwoFinger = null;
+  touchActiveId = null;
+  if (DOM_T.btn) DOM_T.btn.classList.remove('active-trackpad');
+  if (!silencioso) notificar('Modo Trackpad OFF');
+}
+
+function toggleTrackpad() {
+  if (DOM_T.btn && DOM_T.btn.disabled) return;
+  if (trackpadActivo) desactivarTrackpad();
+  else activarTrackpad();
+}
+if (DOM_T.btn) DOM_T.btn.addEventListener('click', toggleTrackpad);
+
+function esTargetDeTrackpad(target) {
+  if (!trackpadActivo) return false;
+  if (!DOM.canvasContainer.contains(target)) return false;
+  if (target.closest('button, .measure-panel, .info-fab, .info-card, .pdf-menu, .empty-state, .snap-btn, .measure-tool-btn, .trackpad-hint')) return false;
+  return true;
+}
+
+function dispararClickEnCursor() {
+  const rect = DOM.canvasContainer.getBoundingClientRect();
+  const clientX = rect.left + trackpadCursorPx.x;
+  const clientY = rect.top  + trackpadCursorPx.y;
+  const target = DOM.viewerContainer;
+  const ev = new MouseEvent('click', {
+    bubbles: true, cancelable: true, view: window,
+    clientX, clientY, button: 0
+  });
+  target.dispatchEvent(ev);
+}
+
+function handleTouchStart(e) {
+  if (!esTargetDeTrackpad(e.target)) return;
+  e.preventDefault(); e.stopPropagation();
+
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    touchFingers.set(t.identifier, {
+      startX: t.clientX, startY: t.clientY,
+      lastX: t.clientX, lastY: t.clientY,
+      startTime: Date.now(), moved: false
+    });
+  }
+
+  if (touchFingers.size === 1) {
+    touchActiveId = Array.from(touchFingers.keys())[0];
+    touchTwoFinger = null;
+  } else if (touchFingers.size >= 2) {
+    const ids = Array.from(touchFingers.keys()).slice(0, 2);
+    const f1 = touchFingers.get(ids[0]);
+    const f2 = touchFingers.get(ids[1]);
+    touchTwoFinger = {
+      startDist: Math.max(1, Math.hypot(f2.startX - f1.startX, f2.startY - f1.startY)),
+      startCenterX: (f1.startX + f2.startX) / 2,
+      startCenterY: (f1.startY + f2.startY) / 2,
+      ids
+    };
+  }
+  mostrarHintTrackpad(2500);
+}
+
+function handleTouchMove(e) {
+  if (!trackpadActivo) return;
+  if (!DOM.canvasContainer.contains(e.target)) return;
+  e.preventDefault(); e.stopPropagation();
+
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    const f = touchFingers.get(t.identifier);
+    if (!f) continue;
+    const dx = t.clientX - f.lastX;
+    const dy = t.clientY - f.lastY;
+    if (Math.hypot(t.clientX - f.startX, t.clientY - f.startY) > 8) f.moved = true;
+
+    if (touchFingers.size === 1 && t.identifier === touchActiveId) {
+      trackpadCursorPx.x += dx;
+      trackpadCursorPx.y += dy;
+    }
+    f.lastX = t.clientX; f.lastY = t.clientY;
+  }
+
+  // Pinza con 2 dedos → zoom
+  if (touchFingers.size >= 2 && touchTwoFinger) {
+    const ids = touchTwoFinger.ids;
+    const f1 = touchFingers.get(ids[0]);
+    const f2 = touchFingers.get(ids[1]);
+    if (!f1 || !f2) return;
+    const curDist = Math.max(1, Math.hypot(f2.lastX - f1.lastX, f2.lastY - f1.lastY));
+    const ratio = curDist / touchTwoFinger.startDist;
+    const curCenterX = (f1.lastX + f2.lastX) / 2;
+    const curCenterY = (f1.lastY + f2.lastY) / 2;
+    if (Math.abs(ratio - 1) > 0.01) {
+      zoomAtScreenPoint(ratio, curCenterX, curCenterY);
+      touchTwoFinger.startDist = curDist;
+    }
+    return;
+  }
+
+  if (touchFingers.size === 1) posicionarCursorTrackpad();
+}
+
+function handleTouchEnd(e) {
+  if (!trackpadActivo) return;
+  if (!DOM.canvasContainer.contains(e.target)) return;
+  e.preventDefault(); e.stopPropagation();
+
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    const f = touchFingers.get(t.identifier);
+    if (!f) continue;
+    const wasSingle = (touchFingers.size === 1);
+    const duration = Date.now() - f.startTime;
+    const isTap = wasSingle && !f.moved && duration < 320 && t.identifier === touchActiveId;
+    if (isTap) dispararClickEnCursor();
+    touchFingers.delete(t.identifier);
+  }
+
+  if (touchFingers.size === 0) {
+    touchActiveId = null; touchTwoFinger = null;
+  } else if (touchFingers.size === 1) {
+    touchActiveId = Array.from(touchFingers.keys())[0];
+    touchTwoFinger = null;
+    const f = touchFingers.get(touchActiveId);
+    if (f) f.moved = true;
+  }
+}
+
+document.addEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
+document.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+document.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
+document.addEventListener('touchcancel', handleTouchEnd, { passive: false, capture: true });
+
+window.addEventListener('resize', () => {
+  if (trackpadActivo) {
+    const rect = DOM.canvasContainer.getBoundingClientRect();
+    trackpadCursorPx.x = Math.min(trackpadCursorPx.x, rect.width - 2);
+    trackpadCursorPx.y = Math.min(trackpadCursorPx.y, rect.height - 2);
+    posicionarCursorTrackpad();
+  }
+});
 </script>
 </body>
 </html>
