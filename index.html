@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor DWG con Capas y Textos</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 4px; }
+        .subtitle { color: #666; margin-bottom: 16px; font-size: 0.9rem; }
+        .controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+        .controls input[type="file"] {
+            padding: 8px; border: 1px solid #ccc; border-radius: 6px; background: white;
+        }
+        .controls button {
+            padding: 8px 20px; border: none; border-radius: 6px;
+            background: #2563eb; color: white; font-weight: 600; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .controls button:hover { background: #1d4ed8; }
+        .controls button:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        /* Contenedor principal: visor + panel de capas */
+        .main-area {
+            display: flex;
+            flex: 1;
+            gap: 16px;
+            min-height: 0; /* Permite que el flex child se encoja */
+        }
+
+        #viewer-container {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #1a1a1a;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Panel de capas lateral */
+        #layer-panel {
+            width: 220px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            overflow-y: auto;
+            display: none; /* Se muestra tras cargar un DXF */
+            flex-shrink: 0;
+        }
+        #layer-panel h3 {
+            margin: 0 0 8px 0;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #555;
+        }
+        .layer-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .layer-item input[type="checkbox"] {
+            cursor: pointer;
+            accent-color: #2563eb;
+        }
+        .layer-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+            flex-shrink: 0;
+        }
+        .layer-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #status {
+            margin-top: 12px; padding: 10px 14px; background: #1e293b;
+            color: #e2e8f0; border-radius: 6px; font-family: monospace;
+            font-size: 0.85rem; min-height: 40px; white-space: pre-wrap;
+        }
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 0.75rem; font-weight: 600; background: #dcfce7; color: #166534;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Visor DWG con Panel de Capas</h1>
+    <p class="subtitle">
+        Conversión DWG → DXF con <strong>dwgdxf</strong> (acadrust/WASM) · Renderizado con <strong>dxf-viewer</strong>
+        <span class="badge">100% cliente</span>
+    </p>
+
+    <div class="controls">
+        <input type="file" id="file-input" accept=".dwg">
+        <button id="convert-btn" disabled>Convertir y Ver</button>
+    </div>
+
+    <div class="main-area">
+        <div id="viewer-container"></div>
+        <div id="layer-panel">
+            <h3>Capas</h3>
+            <div id="layer-list"></div>
+        </div>
+    </div>
+
+    <div id="status">Esperando archivo DWG...</div>
+
+    <!-- Importmap con three, dwgdxf y dxf-viewer -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "dwgdxf": "https://cdn.jsdelivr.net/npm/dwgdxf@2.0.1/+esm",
+            "dxf-viewer": "https://cdn.jsdelivr.net/npm/dxf-viewer@1.0.48/+esm"
+        }
+    }
+    </script>
+
+    <script type="module">
+        // 1) Exponer THREE globalmente (dxf-viewer lo requiere)
+        import * as THREE from 'three';
+        window.THREE = THREE;
+
+        // 2) Importar conversor y visor
+        import { init, convertDwgToDxf, CDN_WASM_BASE } from 'dwgdxf';
+        import { DxfViewer } from 'dxf-viewer';
+
+        // --- Referencias del DOM ---
+        const fileInput = document.getElementById('file-input');
+        const convertBtn = document.getElementById('convert-btn');
+        const statusEl = document.getElementById('status');
+        const viewerContainer = document.getElementById('viewer-container');
+        const layerPanel = document.getElementById('layer-panel');
+        const layerList = document.getElementById('layer-list');
+
+        let selectedFile = null;
+        let viewer = null;
+
+        function log(message) {
+            statusEl.textContent = message;
+        }
+
+        // --- Inicializar (o reiniciar) el visor DXF ---
+        function initViewer() {
+            if (viewer) {
+                viewer.Destroy();
+                viewer = null;
+            }
+            viewer = new DxfViewer(viewerContainer, {
+                clearColor: new THREE.Color(0x1a1a1a),
+                autoResize: true,
+            });
+            return viewer;
+        }
+
+        // --- Generar el panel de capas a partir del visor ---
+        function buildLayerPanel() {
+            layerList.innerHTML = '';
+            if (!viewer) return;
+
+            // GetLayers() devuelve un iterable de objetos { name, color }
+            const layers = viewer.GetLayers();
+            const layerArray = Array.from(layers);
+
+            if (layerArray.length === 0) {
+                layerPanel.style.display = 'none';
+                return;
+            }
+
+            layerArray.forEach(layerInfo => {
+                const item = document.createElement('div');
+                item.className = 'layer-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = true; // Por defecto, todas visibles
+                checkbox.id = `layer-${layerInfo.name}`;
+
+                // Convertir el color numérico a un string CSS
+                const colorHex = '#' + layerInfo.color.toString(16).padStart(6, '0');
+                const colorSwatch = document.createElement('span');
+                colorSwatch.className = 'layer-color';
+                colorSwatch.style.backgroundColor = colorHex;
+
+                const label = document.createElement('span');
+                label.className = 'layer-name';
+                label.textContent = layerInfo.name;
+
+                // Al cambiar el checkbox, mostrar/ocultar la capa
+                checkbox.addEventListener('change', (e) => {
+                    viewer.ShowLayer(layerInfo.name, e.target.checked);
+                });
+
+                item.appendChild(checkbox);
+                item.appendChild(colorSwatch);
+                item.appendChild(label);
+                layerList.appendChild(item);
+            });
+
+            // Mostrar el panel
+            layerPanel.style.display = 'block';
+        }
+
+        // --- Manejar selección de archivo ---
+        fileInput.addEventListener('change', (e) => {
+            selectedFile = e.target.files[0] || null;
+            convertBtn.disabled = !selectedFile;
+            // Ocultar panel de capas hasta que se cargue un nuevo dibujo
+            layerPanel.style.display = 'none';
+            if (selectedFile) {
+                log(`Archivo seleccionado: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)`);
+            } else {
+                log('Esperando archivo DWG...');
+            }
+        });
+
+        // --- Proceso de conversión, renderizado y capas ---
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            convertBtn.disabled = true;
+            log('⏳ Inicializando módulo WASM...');
+
+            try {
+                // 1. Inicializar WASM
+                await init({ wasmBase: CDN_WASM_BASE });
+                log('✅ WASM listo. Leyendo archivo DWG...');
+
+                // 2. Leer DWG
+                const arrayBuffer = await selectedFile.arrayBuffer();
+                const dwgBytes = new Uint8Array(arrayBuffer);
+
+                // 3. Convertir a DXF
+                log('🔄 Convirtiendo DWG a DXF...');
+                const dxfBytes = await convertDwgToDxf(dwgBytes);
+                const dxfText = new TextDecoder().decode(dxfBytes);
+                log(`✅ Conversión exitosa. DXF: ${(dxfBytes.length / 1024).toFixed(1)} KB. Renderizando...`);
+
+                // 4. Preparar visor y cargar DXF con fuentes desde CDN
+                initViewer();
+
+                const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
+                const dxfUrl = URL.createObjectURL(dxfBlob);
+
+                // 🔤 FUENTES DESDE CDN: Se cargan bajo demanda cuando el visor encuentra texto.
+                //    Si un carácter no está en la primera fuente, prueba con la siguiente.
+                await viewer.Load({
+                    url: dxfUrl,
+                    fonts: [
+                        // Roboto Regular (TTF directo desde Google Fonts CDN)
+                        'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.ttf',
+                        // Open Sans Regular (TTF desde jsDelivr)
+                        'https://cdn.jsdelivr.net/npm/open-sans-fonts@1.6.2/open-sans-regular.ttf'
+                    ]
+                });
+
+                URL.revokeObjectURL(dxfUrl);
+
+                // 5. Construir el panel de capas
+                buildLayerPanel();
+
+                log('✅ Dibujo renderizado. Usa el ratón para hacer zoom. Las capas están a la derecha.');
+
+            } catch (err) {
+                console.error(err);
+                log(`❌ Error: ${err.message || err}`);
+                layerPanel.style.display = 'none';
+            } finally {
+                convertBtn.disabled = false;
+            }
+        });
+
+        // Inicializar un visor vacío al cargar
+        initViewer();
+    </script>
+</body>
+</html>
