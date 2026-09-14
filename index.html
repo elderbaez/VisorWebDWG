@@ -29,12 +29,11 @@
         .controls button:hover { background: #1d4ed8; }
         .controls button:disabled { background: #94a3b8; cursor: not-allowed; }
 
-        /* Contenedor principal: visor + panel de capas */
         .main-area {
             display: flex;
             flex: 1;
             gap: 16px;
-            min-height: 0; /* Permite que el flex child se encoja */
+            min-height: 0;
         }
 
         #viewer-container {
@@ -46,7 +45,6 @@
             position: relative;
         }
 
-        /* Panel de capas lateral */
         #layer-panel {
             width: 220px;
             background: white;
@@ -54,7 +52,7 @@
             border-radius: 8px;
             padding: 12px;
             overflow-y: auto;
-            display: none; /* Se muestra tras cargar un DXF */
+            display: none;
             flex-shrink: 0;
         }
         #layer-panel h3 {
@@ -123,7 +121,6 @@
 
     <div id="status">Esperando archivo DWG...</div>
 
-    <!-- Importmap con three, dwgdxf y dxf-viewer -->
     <script type="importmap">
     {
         "imports": {
@@ -135,15 +132,12 @@
     </script>
 
     <script type="module">
-        // 1) Exponer THREE globalmente (dxf-viewer lo requiere)
         import * as THREE from 'three';
         window.THREE = THREE;
 
-        // 2) Importar conversor y visor
         import { init, convertDwgToDxf, CDN_WASM_BASE } from 'dwgdxf';
         import { DxfViewer } from 'dxf-viewer';
 
-        // --- Referencias del DOM ---
         const fileInput = document.getElementById('file-input');
         const convertBtn = document.getElementById('convert-btn');
         const statusEl = document.getElementById('status');
@@ -158,7 +152,6 @@
             statusEl.textContent = message;
         }
 
-        // --- Inicializar (o reiniciar) el visor DXF ---
         function initViewer() {
             if (viewer) {
                 viewer.Destroy();
@@ -171,12 +164,10 @@
             return viewer;
         }
 
-        // --- Generar el panel de capas a partir del visor ---
         function buildLayerPanel() {
             layerList.innerHTML = '';
             if (!viewer) return;
 
-            // GetLayers() devuelve un iterable de objetos { name, color }
             const layers = viewer.GetLayers();
             const layerArray = Array.from(layers);
 
@@ -191,10 +182,9 @@
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.checked = true; // Por defecto, todas visibles
+                checkbox.checked = true;
                 checkbox.id = `layer-${layerInfo.name}`;
 
-                // Convertir el color numérico a un string CSS
                 const colorHex = '#' + layerInfo.color.toString(16).padStart(6, '0');
                 const colorSwatch = document.createElement('span');
                 colorSwatch.className = 'layer-color';
@@ -204,7 +194,6 @@
                 label.className = 'layer-name';
                 label.textContent = layerInfo.name;
 
-                // Al cambiar el checkbox, mostrar/ocultar la capa
                 checkbox.addEventListener('change', (e) => {
                     viewer.ShowLayer(layerInfo.name, e.target.checked);
                 });
@@ -215,15 +204,12 @@
                 layerList.appendChild(item);
             });
 
-            // Mostrar el panel
             layerPanel.style.display = 'block';
         }
 
-        // --- Manejar selección de archivo ---
         fileInput.addEventListener('change', (e) => {
             selectedFile = e.target.files[0] || null;
             convertBtn.disabled = !selectedFile;
-            // Ocultar panel de capas hasta que se cargue un nuevo dibujo
             layerPanel.style.display = 'none';
             if (selectedFile) {
                 log(`Archivo seleccionado: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)`);
@@ -232,7 +218,6 @@
             }
         });
 
-        // --- Proceso de conversión, renderizado y capas ---
         convertBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
@@ -240,41 +225,35 @@
             log('⏳ Inicializando módulo WASM...');
 
             try {
-                // 1. Inicializar WASM
                 await init({ wasmBase: CDN_WASM_BASE });
                 log('✅ WASM listo. Leyendo archivo DWG...');
 
-                // 2. Leer DWG
                 const arrayBuffer = await selectedFile.arrayBuffer();
                 const dwgBytes = new Uint8Array(arrayBuffer);
 
-                // 3. Convertir a DXF
                 log('🔄 Convirtiendo DWG a DXF...');
                 const dxfBytes = await convertDwgToDxf(dwgBytes);
                 const dxfText = new TextDecoder().decode(dxfBytes);
                 log(`✅ Conversión exitosa. DXF: ${(dxfBytes.length / 1024).toFixed(1)} KB. Renderizando...`);
 
-                // 4. Preparar visor y cargar DXF con fuentes desde CDN
                 initViewer();
 
                 const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
                 const dxfUrl = URL.createObjectURL(dxfBlob);
 
-                // 🔤 FUENTES DESDE CDN: Se cargan bajo demanda cuando el visor encuentra texto.
-                //    Si un carácter no está en la primera fuente, prueba con la siguiente.
+                // 🔤 FUENTES TTF DIRECTAS (sin redirecciones)
                 await viewer.Load({
                     url: dxfUrl,
                     fonts: [
-                        // Roboto Regular (TTF directo desde Google Fonts CDN)
-                        'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.ttf',
-                        // Open Sans Regular (TTF desde jsDelivr)
-                        'https://cdn.jsdelivr.net/npm/open-sans-fonts@1.6.2/open-sans-regular.ttf'
+                        // Aspekta Variable Font (TTF real, servido directamente por jsDelivr)
+                        'https://cdn.jsdelivr.net/gh/hund-press/font-families@v1.0.0/aspekta/fonts/webfonts/AspektaVF.ttf',
+                        // Segunda fuente de respaldo (también TTF directa)
+                        'https://cdn.jsdelivr.net/gh/hund-press/font-families@v1.0.0/aspekta/fonts/webfonts/Aspekta-400.ttf'
                     ]
                 });
 
                 URL.revokeObjectURL(dxfUrl);
 
-                // 5. Construir el panel de capas
                 buildLayerPanel();
 
                 log('✅ Dibujo renderizado. Usa el ratón para hacer zoom. Las capas están a la derecha.');
@@ -288,7 +267,6 @@
             }
         });
 
-        // Inicializar un visor vacío al cargar
         initViewer();
     </script>
 </body>
