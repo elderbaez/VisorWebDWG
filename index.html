@@ -42,7 +42,7 @@ body {
 .app-title { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; color: var(--text-main); }
 .app-logo-svg { width: 22px; height: 22px; fill: var(--accent); }
 .app-subtitle { font-size: 0.7rem; font-weight: 500; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase; padding-left: 0.75rem; border-left: 1px solid var(--border); margin-left: 0.25rem; }
-.viewer-actions { display: flex; gap: 0.5rem; align-items: center; }
+.viewer-actions { display: flex; gap: 0.5rem; align-items: center; position: relative; }
 
 .btn {
   display: inline-flex; align-items: center; gap: 0.4rem;
@@ -51,11 +51,33 @@ body {
   border: 1px solid var(--border); background: var(--panel-card);
   color: var(--text-secondary); transition: var(--transition); font-family: var(--font);
 }
-.btn:hover { background: var(--border); color: var(--text-main); border-color: var(--border-hover); }
+.btn:hover:not(:disabled) { background: var(--border); color: var(--text-main); border-color: var(--border-hover); }
 .btn svg { width: 15px; height: 15px; }
 .btn-accent { background: var(--accent); color: #fff; border-color: transparent; }
-.btn-accent:hover { background: var(--accent-hover); color: #fff; }
+.btn-accent:hover:not(:disabled) { background: var(--accent-hover); color: #fff; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn .chevron { width: 10px !important; height: 10px !important; margin-left: 2px; }
+
+.pdf-menu {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius-md); box-shadow: var(--shadow);
+  min-width: 280px; z-index: 100;
+  display: none; flex-direction: column; overflow: hidden;
+  animation: pdfSlide 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pdf-menu.activo { display: flex; }
+@keyframes pdfSlide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+.pdf-menu-item {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  padding: 0.75rem 0.9rem; cursor: pointer; transition: var(--transition);
+  border-bottom: 1px solid var(--border);
+}
+.pdf-menu-item:last-child { border-bottom: none; }
+.pdf-menu-item:hover { background: var(--border); }
+.pdf-menu-item svg { width: 18px; height: 18px; stroke: var(--accent); fill: none; flex-shrink: 0; margin-top: 1px; }
+.pdf-menu-item .pdf-mi-title { font-size: 0.78rem; font-weight: 700; color: var(--text-main); line-height: 1.25; }
+.pdf-menu-item .pdf-mi-sub { font-size: 0.66rem; font-weight: 500; color: var(--text-secondary); margin-top: 2px; line-height: 1.35; }
 
 .btn-sidebar-toggle {
   display: none; align-items: center; justify-content: center;
@@ -127,18 +149,6 @@ body {
   padding: 1rem 0.5rem; line-height: 1.5; font-weight: 500;
 }
 
-.quick-actions { display: flex; flex-direction: column; gap: 0.5rem; }
-.btn-panel {
-  display: flex; align-items: center; gap: 0.6rem; width: 100%;
-  padding: 0.55rem 0.75rem; border-radius: var(--radius-md);
-  background: var(--panel-card); border: 1px solid var(--border);
-  color: var(--text-main); font-family: var(--font); font-size: 0.775rem;
-  font-weight: 600; cursor: pointer; transition: var(--transition); text-align: left;
-}
-.btn-panel:hover:not(:disabled) { background: var(--border); border-color: var(--border-hover); }
-.btn-panel:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-panel svg { width: 15px; height: 15px; stroke: currentColor; fill: none; flex-shrink: 0; }
-
 .main-area { flex: 1; display: flex; overflow: hidden; position: relative; }
 .canvas-container {
   flex: 1; position: relative; background: #0d1117;
@@ -160,6 +170,7 @@ body {
   background: rgba(248,81,73,0.12); z-index: 9998;
   pointer-events: none; border-radius: 2px;
 }
+.selection-rect.pdf { border-color: var(--accent); background: rgba(47,129,247,0.12); }
 
 .empty-state {
   position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -212,6 +223,7 @@ body {
 .loading-sub { font-size: 0.7rem; color: var(--text-dim); font-weight: 500; max-width: 340px; text-align: center; }
 
 .canvas-container.mode-clickhide #viewer-container { cursor: crosshair; }
+.canvas-container.mode-pdfarea #viewer-container { cursor: crosshair; }
 
 .info-fab {
   position: absolute; bottom: 1rem; right: 1rem;
@@ -259,27 +271,34 @@ body {
 .info-link.whatsapp .info-link-label small { color: #25D366; opacity: 0.85; }
 
 .viewer-status-bar {
-  height: 32px; background: var(--panel); border-top: 1px solid var(--border);
+  height: 34px; background: var(--panel); border-top: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 1rem; font-size: 0.72rem; font-weight: 500;
   color: var(--text-secondary); z-index: 50; flex-shrink: 0;
 }
-.status-left { display: flex; gap: 1.5rem; align-items: center; overflow: hidden; }
+.status-left { display: flex; gap: 1.5rem; align-items: center; overflow: hidden; min-width: 0; }
 .status-left span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .status-coords { color: var(--accent); font-variant-numeric: tabular-nums; }
-.status-right { display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0; }
+.status-right { display: flex; gap: 0.2rem; align-items: center; flex-shrink: 0; }
+.status-divider { width: 1px; height: 16px; background: var(--border); margin: 0 0.35rem; }
 .cad-tool-btn {
   background: transparent; border: none; color: var(--text-secondary);
   cursor: pointer; padding: 3px 8px; border-radius: 4px;
   display: flex; align-items: center; gap: 5px;
   transition: var(--transition); font-weight: 600; font-family: var(--font);
-  font-size: 0.72rem;
+  font-size: 0.72rem; position: relative;
 }
 .cad-tool-btn:hover:not(:disabled) { background: var(--border); color: var(--text-main); }
-.cad-tool-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.cad-tool-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .cad-tool-btn.active { background: var(--accent); color: #fff; }
 .cad-tool-btn.active-danger { background: var(--danger); color: #fff; }
-.cad-tool-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; }
+.cad-tool-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+.cad-tool-btn .badge {
+  background: var(--accent); color: #fff; font-size: 0.6rem;
+  padding: 1px 5px; border-radius: 8px; font-weight: 700;
+  min-width: 16px; text-align: center;
+}
+.cad-tool-btn.active .badge { background: #fff; color: var(--accent); }
 
 .notificacion {
   position: fixed; bottom: 3.75rem; left: 50%; transform: translateX(-50%);
@@ -292,7 +311,7 @@ body {
 .notificacion.warn { background: var(--warning); color: #1a1a1a; }
 @keyframes slideUp { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .btn-sidebar-toggle { display: inline-flex; }
   .side-panel {
     position: absolute; top: 0; left: 0; bottom: 0; z-index: 500;
@@ -309,7 +328,7 @@ body {
   .viewer-actions { gap: 0.35rem; }
   .viewer-status-bar { padding: 0 0.5rem; font-size: 0.65rem; }
   .status-left { gap: 0.75rem; }
-  .cad-tool-btn span { display: none; }
+  .cad-tool-btn span:not(.badge) { display: none; }
   .cad-tool-btn { padding: 4px 6px; }
 }
 </style>
@@ -334,10 +353,27 @@ body {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
         <span class="btn-label">Abrir DWG</span>
       </button>
-      <button class="btn" id="btnScreenshot" title="Exportar captura PNG" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-        <span class="btn-label">Captura</span>
+      <button class="btn" id="btnPdf" title="Exportar a PDF" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        <span class="btn-label">PDF</span>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
+      <div class="pdf-menu" id="pdfMenu">
+        <div class="pdf-menu-item" id="pdfOptVisible">
+          <svg viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <div>
+            <div class="pdf-mi-title">Exportar vista actual</div>
+            <div class="pdf-mi-sub">Genera un PDF con lo que se ve en pantalla, respetando el zoom y encuadre.</div>
+          </div>
+        </div>
+        <div class="pdf-menu-item" id="pdfOptArea">
+          <svg viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+          <div>
+            <div class="pdf-mi-title">Seleccionar un área</div>
+            <div class="pdf-mi-sub">Arrastrá un rectángulo sobre el plano y se exportará solo esa zona.</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -368,23 +404,6 @@ body {
         </div>
         <div class="layer-list" id="layerList">
           <div class="layer-empty" id="layerEmpty">Cargá un archivo DWG para ver las capas del dibujo.</div>
-        </div>
-      </div>
-
-      <div class="panel-section">
-        <div class="section-header">
-          <svg viewBox="0 0 24 24" stroke-width="1.75"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          Acciones
-        </div>
-        <div class="quick-actions">
-          <button class="btn-panel" id="btnToggleAll" disabled>
-            <svg viewBox="0 0 24 24" stroke-width="1.75"><polyline points="20 6 9 17 4 12"/></svg>
-            <span id="txtToggleAll">Ocultar todas las capas</span>
-          </button>
-          <button class="btn-panel" id="btnUndo" disabled>
-            <svg viewBox="0 0 24 24" stroke-width="1.75"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
-            Deshacer cambio de capa <span id="undoCount" style="margin-left:auto;color:var(--text-dim);font-size:0.7rem;font-weight:700;"></span>
-          </button>
         </div>
       </div>
     </div>
@@ -466,15 +485,27 @@ body {
       <button class="cad-tool-btn" id="btnZoomOut" title="Alejar" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
       </button>
-      <button class="cad-tool-btn" id="btnFit" title="Ajustar a pantalla" disabled>
+      <button class="cad-tool-btn" id="btnFit" title="Ajustar a pantalla (F)" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M21 8V5a2 2 0 00-2-2h-3"/><path d="M3 16v3a2 2 0 002 2h3"/><path d="M16 21h3a2 2 0 002-2v-3"/></svg>
         <span>Ajustar</span>
       </button>
-      <button class="cad-tool-btn active" id="btnGrid" title="Mostrar/ocultar cuadrícula">
+      <button class="cad-tool-btn active" id="btnGrid" title="Cuadrícula (G)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
         <span>Cuadrícula</span>
       </button>
-      <button class="cad-tool-btn" id="btnClickHide" title="Apagar capa: clic sobre un objeto o arrastrá un cuadro" disabled>
+      <button class="cad-tool-btn" id="btnRegen" title="Refrescar vista (R)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+      </button>
+      <div class="status-divider"></div>
+      <button class="cad-tool-btn" id="btnToggleAll" title="Ocultar/Mostrar todas las capas" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <button class="cad-tool-btn" id="btnUndo" title="Deshacer cambio de capa (Ctrl+Z)" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
+        <span class="badge" id="undoBadge" style="display:none;">0</span>
+      </button>
+      <div class="status-divider"></div>
+      <button class="cad-tool-btn" id="btnClickHide" title="Apagar capa por clic o cuadro (H)" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
         <span>Apagar capa</span>
       </button>
@@ -501,22 +532,22 @@ window.THREE = THREE;
 import { init, convertDwgToDxf, CDN_WASM_BASE } from 'dwgdxf';
 import { DxfViewer } from 'dxf-viewer';
 
-/* ============================================================
-   DOM REFS
-============================================================ */
 const DOM = {
   btnOpen: document.getElementById('btnOpen'),
   btnOpenEmpty: document.getElementById('btnOpenEmpty'),
-  btnScreenshot: document.getElementById('btnScreenshot'),
+  btnPdf: document.getElementById('btnPdf'),
+  pdfMenu: document.getElementById('pdfMenu'),
+  pdfOptVisible: document.getElementById('pdfOptVisible'),
+  pdfOptArea: document.getElementById('pdfOptArea'),
   btnSidebarToggle: document.getElementById('btnSidebarToggle'),
   btnToggleAll: document.getElementById('btnToggleAll'),
-  txtToggleAll: document.getElementById('txtToggleAll'),
   btnUndo: document.getElementById('btnUndo'),
-  undoCount: document.getElementById('undoCount'),
+  undoBadge: document.getElementById('undoBadge'),
   btnZoomIn: document.getElementById('btnZoomIn'),
   btnZoomOut: document.getElementById('btnZoomOut'),
   btnFit: document.getElementById('btnFit'),
   btnGrid: document.getElementById('btnGrid'),
+  btnRegen: document.getElementById('btnRegen'),
   btnClickHide: document.getElementById('btnClickHide'),
   fileInput: document.getElementById('fileInput'),
   sidePanel: document.getElementById('sidePanel'),
@@ -545,23 +576,17 @@ const DOM = {
   statusY: document.getElementById('statusY'),
 };
 
-/* ============================================================
-   ESTADO
-============================================================ */
 let viewer = null;
 let wasmReady = false;
 let layersState = new Map();
 let gridVisible = true;
 let clickHideMode = false;
+let pdfAreaMode = false;
 const stats = { fileSize: 0, fileName: '', entityCount: 0 };
-
 const layerHistory = [];
 let undoing = false;
 const MAX_HISTORY = 60;
 
-/* ============================================================
-   UTILS
-============================================================ */
 function fmtBytes(b) {
   if (b < 1024) return b + ' B';
   if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
@@ -573,9 +598,7 @@ function fmtNum(n) {
   if (abs >= 1) return n.toFixed(2);
   return n.toFixed(3);
 }
-function numToHex(c) {
-  return '#' + (c >>> 0).toString(16).padStart(6, '0').slice(-6);
-}
+function numToHex(c) { return '#' + (c >>> 0).toString(16).padStart(6, '0').slice(-6); }
 function notificar(msg, tipo = 'ok') {
   const n = document.createElement('div');
   n.className = 'notificacion' + (tipo === 'error' ? ' error' : tipo === 'warn' ? ' warn' : '');
@@ -622,9 +645,6 @@ async function getFonts() {
   return cachedFonts;
 }
 
-/* ============================================================
-   VISOR
-============================================================ */
 function initViewer() {
   if (viewer) { try { viewer.Destroy(); } catch (e) {} viewer = null; }
   viewer = new DxfViewer(DOM.viewerContainer, {
@@ -635,12 +655,28 @@ function initViewer() {
 }
 
 /* ============================================================
-   VISIBILIDAD DE CAPAS
+   SINCRONIZACIÓN DE ESTADO
 ============================================================ */
+function syncLayersStateFromScene() {
+  const scene = viewer?.GetScene?.();
+  if (!scene) return;
+  const sceneVis = new Map();
+  for (const obj of scene.children) {
+    const layer = obj._dxfViewerLayer;
+    if (layer && layer.name) {
+      const n = layer.name;
+      const prev = sceneVis.get(n);
+      sceneVis.set(n, prev === undefined ? obj.visible : (prev || obj.visible));
+    }
+  }
+  for (const [name, info] of layersState) {
+    if (sceneVis.has(name)) info.visible = sceneVis.get(name);
+  }
+}
+
 function setLayersVisible(changes) {
   const scene = viewer?.GetScene?.();
   if (!scene) return;
-  // Asegurar matrices actualizadas antes de tocar la escena
   try { scene.updateMatrixWorld(true); } catch (e) {}
   for (const { name, show } of changes) {
     let found = false;
@@ -674,6 +710,7 @@ function renderLayers() {
   DOM.layerCount.textContent = String(layersState.size);
   DOM.btnToggleAll.disabled = false;
   DOM.btnClickHide.disabled = false;
+  updateToggleAllIcon();
 
   const entries = [...layersState.entries()].sort((a, b) => {
     if (a[1].visible !== b[1].visible) return a[1].visible ? -1 : 1;
@@ -696,7 +733,7 @@ function renderLayers() {
         updateUndoUI();
       }
       setLayersVisible([{ name, show: cb.checked }]);
-      updateToggleAllLabel();
+      updateToggleAllIcon();
     });
 
     const sw = document.createElement('span');
@@ -713,27 +750,32 @@ function renderLayers() {
     item.appendChild(nm);
     DOM.layerList.appendChild(item);
   }
-  updateToggleAllLabel();
 }
 
-function updateToggleAllLabel() {
+function updateToggleAllIcon() {
   const total = layersState.size;
   const visibles = [...layersState.values()].filter(v => v.visible).length;
-  DOM.txtToggleAll.textContent =
-    visibles === 0 ? 'Mostrar todas las capas' :
-    visibles === total ? 'Ocultar todas las capas' :
-    `Alternar visibilidad (${visibles}/${total})`;
+  const allVisible = visibles === total && total > 0;
+  const svg = DOM.btnToggleAll.querySelector('svg');
+  if (svg) {
+    if (allVisible) {
+      svg.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`;
+    } else {
+      svg.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+    }
+  }
+  DOM.btnToggleAll.title = allVisible ? 'Ocultar todas las capas' : 'Mostrar todas las capas';
 }
 
 /* ============================================================
    TOGGLE ALL
 ============================================================ */
 DOM.btnToggleAll.addEventListener('click', () => {
+  if (!viewer || layersState.size === 0) return;
+  syncLayersStateFromScene();
   const allNames = [...layersState.keys()];
-  if (allNames.length === 0) return;
   const anyVisible = allNames.some(n => layersState.get(n).visible);
   const target = !anyVisible;
-
   const changes = [];
   for (const name of allNames) {
     const info = layersState.get(name);
@@ -741,17 +783,18 @@ DOM.btnToggleAll.addEventListener('click', () => {
     changes.push({ name, oldVisible: info.visible, newVisible: target });
     info.visible = target;
   }
-  if (changes.length === 0) return;
-
+  if (changes.length === 0) {
+    notificar(target ? 'Todas las capas ya están visibles' : 'Todas las capas ya están ocultas', 'warn');
+    return;
+  }
   setLayersVisible(changes.map(c => ({ name: c.name, show: c.newVisible })));
-
   if (!undoing) {
     layerHistory.push(changes);
     if (layerHistory.length > MAX_HISTORY) layerHistory.shift();
     updateUndoUI();
   }
   renderLayers();
-  notificar(target ? 'Todas las capas visibles' : 'Todas las capas ocultas');
+  notificar(target ? `Mostradas ${changes.length} capa(s)` : `Ocultadas ${changes.length} capa(s)`);
 });
 
 /* ============================================================
@@ -777,7 +820,12 @@ function undoLayerChange() {
 function updateUndoUI() {
   const n = layerHistory.length;
   DOM.btnUndo.disabled = n === 0;
-  DOM.undoCount.textContent = n > 0 ? `(${n})` : '';
+  if (n > 0) {
+    DOM.undoBadge.style.display = '';
+    DOM.undoBadge.textContent = String(n);
+  } else {
+    DOM.undoBadge.style.display = 'none';
+  }
 }
 DOM.btnUndo.addEventListener('click', () => {
   if (undoLayerChange()) notificar('Cambio de capa deshecho');
@@ -793,15 +841,9 @@ function fitView() {
   const origin = viewer.GetOrigin();
   if (!bounds || !origin) return;
   try {
-    viewer.FitView(
-      bounds.minX - origin.x,
-      bounds.maxX - origin.x,
-      bounds.minY - origin.y,
-      bounds.maxY - origin.y,
-      0.1
-    );
+    viewer.FitView(bounds.minX - origin.x, bounds.maxX - origin.x,
+                   bounds.minY - origin.y, bounds.maxY - origin.y, 0.1);
   } catch (e) {
-    console.warn('FitView error:', e);
     const scene = viewer.GetScene();
     const camera = viewer.GetCamera();
     if (!scene || !camera) return;
@@ -834,8 +876,7 @@ function dispatchZoom(deltaY) {
   const cy = rect.top + rect.height / 2;
   try {
     const evt = new WheelEvent('wheel', {
-      deltaY, deltaMode: 0,
-      clientX: cx, clientY: cy,
+      deltaY, deltaMode: 0, clientX: cx, clientY: cy,
       bubbles: true, cancelable: true,
     });
     canvas.dispatchEvent(evt);
@@ -847,7 +888,7 @@ function dispatchZoom(deltaY) {
       Object.defineProperty(evt, 'deltaY', { value: deltaY });
       Object.defineProperty(evt, 'deltaMode', { value: 0 });
       canvas.dispatchEvent(evt);
-    } catch (e2) { console.warn('Zoom fallback failed:', e2); }
+    } catch (e2) {}
   }
 }
 function zoomIn() { dispatchZoom(-240); }
@@ -856,6 +897,19 @@ function zoomOut() { dispatchZoom(240); }
 DOM.btnFit.addEventListener('click', () => { if (!DOM.btnFit.disabled) fitView(); });
 DOM.btnZoomIn.addEventListener('click', () => { if (!DOM.btnZoomIn.disabled) zoomIn(); });
 DOM.btnZoomOut.addEventListener('click', () => { if (!DOM.btnZoomOut.disabled) zoomOut(); });
+
+/* ============================================================
+   REGEN
+============================================================ */
+function regen() {
+  if (!viewer) return;
+  const scene = viewer.GetScene();
+  if (scene) { try { scene.updateMatrixWorld(true); } catch (e) {} }
+  try { viewer.Render(); } catch (e) {}
+  try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+  notificar('Vista refrescada');
+}
+DOM.btnRegen.addEventListener('click', () => { if (!DOM.btnRegen.disabled) regen(); });
 
 /* ============================================================
    COORDENADAS
@@ -877,12 +931,9 @@ DOM.viewerContainer.addEventListener('mousemove', (e) => {
   const hit = new THREE.Vector3();
   if (!raycaster.ray.intersectPlane(plane, hit)) return;
 
-  const modelX = hit.x + origin.x;
-  const modelY = hit.y + origin.y;
-
   DOM.statusCoords.style.display = '';
-  DOM.statusX.textContent = `X: ${fmtNum(modelX)} m`;
-  DOM.statusY.textContent = `Y: ${fmtNum(modelY)} m`;
+  DOM.statusX.textContent = `X: ${fmtNum(hit.x + origin.x)} m`;
+  DOM.statusY.textContent = `Y: ${fmtNum(hit.y + origin.y)} m`;
 });
 DOM.viewerContainer.addEventListener('mouseleave', () => {
   DOM.statusCoords.style.display = 'none';
@@ -907,19 +958,32 @@ DOM.btnGrid.addEventListener('click', () => {
 applyGrid();
 
 /* ============================================================
-   PICKING POR PROYECCIÓN DE VÉRTICES A PANTALLA
-   - No depende del raycaster ni de layers ni de matrices
-   - Funciona con LineSegments, Line, Mesh, Points, cualquier cosa
+   PICKING
+   Punto-segmento (no punto-vértice) para máxima precisión.
 ============================================================ */
 
-/** Devuelve el nombre de la capa asociada a un Object3D, subiendo por la jerarquía */
+/** Distancia cuadrada de un punto a un segmento en 2D */
+function pointSegDist2(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-9) {
+    const ex = px - x1, ey = py - y1;
+    return ex * ex + ey * ey;
+  }
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  if (t < 0) t = 0; else if (t > 1) t = 1;
+  const cx = x1 + t * dx;
+  const cy = y1 + t * dy;
+  const ex = px - cx, ey = py - cy;
+  return ex * ex + ey * ey;
+}
+
 function getLayerNameFromObject(obj) {
   let cur = obj;
   let safety = 0;
   while (cur && safety++ < 30) {
-    if (cur._dxfViewerLayer && cur._dxfViewerLayer.name) {
-      return cur._dxfViewerLayer.name;
-    }
+    if (cur._dxfViewerLayer && cur._dxfViewerLayer.name) return cur._dxfViewerLayer.name;
     if (cur.userData) {
       const ud = cur.userData;
       const candidate = ud.layerName || ud.Layer || ud.layer || ud.LAYER;
@@ -933,50 +997,8 @@ function getLayerNameFromObject(obj) {
   return null;
 }
 
-/** Cache de posiciones de mundo por objeto (se invalida al cargar archivo nuevo) */
-let worldPositionsCache = new WeakMap();
-function getWorldPositions(obj) {
-  if (worldPositionsCache.has(obj)) return worldPositionsCache.get(obj);
-  const geom = obj.geometry;
-  if (!geom || !geom.attributes || !geom.attributes.position) {
-    worldPositionsCache.set(obj, null);
-    return null;
-  }
-  const pos = geom.attributes.position;
-  const count = pos.count;
-  if (count === 0) {
-    worldPositionsCache.set(obj, null);
-    return null;
-  }
-  // Para performance: si hay muchísimos vértices, submuestreamos
-  const MAX_SAMPLES = 800;
-  const step = Math.max(1, Math.floor(count / MAX_SAMPLES));
-  const arr = [];
-  const v = new THREE.Vector3();
-  const m = obj.matrixWorld;
-  for (let i = 0; i < count; i += step) {
-    v.fromBufferAttribute(pos, i);
-    v.applyMatrix4(m);
-    arr.push(v.x, v.y, v.z);
-  }
-  worldPositionsCache.set(obj, arr);
-  return arr;
-}
-
-/** Proyecta un punto 3D de mundo a coordenadas de pantalla */
-function projectToScreen(x, y, z, camera, rect) {
-  const v = new THREE.Vector3(x, y, z);
-  v.project(camera);
-  return {
-    x: (v.x + 1) * 0.5 * rect.width,
-    y: (-v.y + 1) * 0.5 * rect.height,
-    // Opcional: chequear clip
-    behind: v.z > 1,
-  };
-}
-
-/** Picking por proximidad: encuentra la capa más cercana al click en pantalla */
-function pickLayerAtPoint(clientX, clientY, thresholdPx = 14) {
+/** Recorre la escena y devuelve el nombre de capa más cercano al click */
+function pickLayerAtPoint(clientX, clientY, threshold = 14) {
   if (!viewer) return null;
   const scene = viewer.GetScene();
   const camera = viewer.GetCamera();
@@ -988,53 +1010,101 @@ function pickLayerAtPoint(clientX, clientY, thresholdPx = 14) {
   const rect = canvas.getBoundingClientRect();
   const clickX = clientX - rect.left;
   const clickY = clientY - rect.top;
+  const thresh2 = threshold * threshold;
 
   let bestLayer = null;
-  let bestDist = thresholdPx;
+  let bestDist2 = thresh2;
+
+  const halfW = rect.width * 0.5;
+  const halfH = rect.height * 0.5;
+  const v = new THREE.Vector3();
+  const MAX_SAMPLES = 15000;
 
   const visit = (obj) => {
     if (!obj) return;
-    // Solo considerar objetos visibles (y sus ancestros visibles)
-    let anc = obj;
-    let visible = true;
+    // Chequear visibilidad (self + ancestros)
+    let anc = obj, visible = true;
     while (anc && anc !== scene) {
       if (anc.visible === false) { visible = false; break; }
       anc = anc.parent;
     }
-    if (visible) {
-      const positions = getWorldPositions(obj);
-      if (positions) {
-        const len = positions.length;
-        for (let i = 0; i < len; i += 3) {
-          const p = projectToScreen(positions[i], positions[i + 1], positions[i + 2], camera, rect);
-          if (p.behind) continue;
-          const d = Math.hypot(p.x - clickX, p.y - clickY);
-          if (d < bestDist) {
+    if (!visible) return;
+
+    const geom = obj.geometry;
+    const pos = geom && geom.attributes && geom.attributes.position;
+    if (pos && pos.count > 0) {
+      const m = obj.matrixWorld;
+      const count = pos.count;
+
+      const project = (i) => {
+        v.fromBufferAttribute(pos, i);
+        v.applyMatrix4(m);
+        v.project(camera);
+        return {
+          x: (v.x + 1) * halfW,
+          y: (-v.y + 1) * halfH,
+          behind: v.z > 1,
+        };
+      };
+
+      if (obj.isLineSegments) {
+        // Cada 2 vértices es un segmento. Muestreamos POR SEGMENTOS completos.
+        const segCount = Math.floor(count / 2);
+        const segStep = Math.max(1, Math.ceil(segCount / MAX_SAMPLES));
+        for (let s = 0; s < segCount; s += segStep) {
+          const a = project(s * 2);
+          const b = project(s * 2 + 1);
+          if (a.behind || b.behind) continue;
+          const d2 = pointSegDist2(clickX, clickY, a.x, a.y, b.x, b.y);
+          if (d2 < bestDist2) {
             const lname = getLayerNameFromObject(obj);
-            if (lname) {
-              bestDist = d;
-              bestLayer = lname;
+            if (lname) { bestDist2 = d2; bestLayer = lname; }
+          }
+        }
+      } else if (obj.isLine) {
+        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
+        let prev = null;
+        for (let i = 0; i < count; i += vStep) {
+          const p = project(i);
+          if (prev && !prev.behind && !p.behind) {
+            const d2 = pointSegDist2(clickX, clickY, prev.x, prev.y, p.x, p.y);
+            if (d2 < bestDist2) {
+              const lname = getLayerNameFromObject(obj);
+              if (lname) { bestDist2 = d2; bestLayer = lname; }
             }
+          }
+          prev = p;
+        }
+      } else {
+        // Points, Meshes y demás: distancia a vértice
+        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
+        for (let i = 0; i < count; i += vStep) {
+          const p = project(i);
+          if (p.behind) continue;
+          const dx = p.x - clickX;
+          const dy = p.y - clickY;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < bestDist2) {
+            const lname = getLayerNameFromObject(obj);
+            if (lname) { bestDist2 = d2; bestLayer = lname; }
           }
         }
       }
     }
-    if (obj.children && obj.children.length) {
-      for (const c of obj.children) visit(c);
-    }
+    if (obj.children) for (const c of obj.children) visit(c);
   };
+
   for (const c of scene.children) visit(c);
   return bestLayer;
 }
 
-/** Picking por caja: encuentra todas las capas con geometría visible dentro del rect */
+/** Rectángulo en pantalla: qué capas tienen geometría dentro */
 function pickLayersInBox(x1, y1, x2, y2) {
   if (!viewer) return [];
   const scene = viewer.GetScene();
   const camera = viewer.GetCamera();
   const canvas = viewer.GetCanvas();
   if (!scene || !camera || !canvas) return [];
-
   try { scene.updateMatrixWorld(true); } catch (e) {}
 
   const rect = canvas.getBoundingClientRect();
@@ -1044,33 +1114,87 @@ function pickLayersInBox(x1, y1, x2, y2) {
   const ry2 = Math.max(y1, y2) - rect.top;
 
   const layers = new Set();
+  const halfW = rect.width * 0.5;
+  const halfH = rect.height * 0.5;
+  const v = new THREE.Vector3();
+  const MAX_SAMPLES = 15000;
+
+  // ¿Segmento intersecta el rectángulo?
+  const segIntersectsRect = (ax, ay, bx, by) => {
+    // Algún endpoint adentro
+    if ((ax >= rx1 && ax <= rx2 && ay >= ry1 && ay <= ry2) ||
+        (bx >= rx1 && bx <= rx2 && by >= ry1 && by <= ry2)) return true;
+    // Proyección sobre los 4 bordes — forma simple: chequeamos intersección
+    const ccw = (px, py, qx, qy, rx, ry) => (qy - py) * (rx - qx) - (qx - px) * (ry - qy);
+    const segInter = (p1x, p1y, p2x, p2y, p3x, p3y, p4x, p4y) => {
+      const d1 = ccw(p3x, p3y, p4x, p4y, p1x, p1y);
+      const d2 = ccw(p3x, p3y, p4x, p4y, p2x, p2y);
+      const d3 = ccw(p1x, p1y, p2x, p2y, p3x, p3y);
+      const d4 = ccw(p1x, p1y, p2x, p2y, p4x, p4y);
+      if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+          ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+      return false;
+    };
+    return segInter(ax, ay, bx, by, rx1, ry1, rx2, ry1) ||
+           segInter(ax, ay, bx, by, rx2, ry1, rx2, ry2) ||
+           segInter(ax, ay, bx, by, rx2, ry2, rx1, ry2) ||
+           segInter(ax, ay, bx, by, rx1, ry2, rx1, ry1);
+  };
 
   const visit = (obj) => {
     if (!obj) return;
-    let anc = obj;
-    let visible = true;
+    let anc = obj, visible = true;
     while (anc && anc !== scene) {
       if (anc.visible === false) { visible = false; break; }
       anc = anc.parent;
     }
-    if (visible) {
-      const positions = getWorldPositions(obj);
-      if (positions) {
-        const len = positions.length;
-        for (let i = 0; i < len; i += 3) {
-          const p = projectToScreen(positions[i], positions[i + 1], positions[i + 2], camera, rect);
-          if (p.behind) continue;
-          if (p.x >= rx1 && p.x <= rx2 && p.y >= ry1 && p.y <= ry2) {
-            const lname = getLayerNameFromObject(obj);
-            if (lname) layers.add(lname);
-            break; // un vértice adentro alcanza
+    if (!visible) return;
+
+    const geom = obj.geometry;
+    const pos = geom && geom.attributes && geom.attributes.position;
+    if (pos && pos.count > 0) {
+      const m = obj.matrixWorld;
+      const count = pos.count;
+      const project = (i) => {
+        v.fromBufferAttribute(pos, i);
+        v.applyMatrix4(m);
+        v.project(camera);
+        return { x: (v.x + 1) * halfW, y: (-v.y + 1) * halfH, behind: v.z > 1 };
+      };
+      const addIfHit = () => {
+        const lname = getLayerNameFromObject(obj);
+        if (lname) layers.add(lname);
+      };
+
+      if (obj.isLineSegments) {
+        const segCount = Math.floor(count / 2);
+        const segStep = Math.max(1, Math.ceil(segCount / MAX_SAMPLES));
+        for (let s = 0; s < segCount; s += segStep) {
+          const a = project(s * 2);
+          const b = project(s * 2 + 1);
+          if (a.behind || b.behind) continue;
+          if (segIntersectsRect(a.x, a.y, b.x, b.y)) { addIfHit(); break; }
+        }
+      } else if (obj.isLine) {
+        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
+        let prev = null;
+        for (let i = 0; i < count; i += vStep) {
+          const p = project(i);
+          if (prev && !prev.behind && !p.behind) {
+            if (segIntersectsRect(prev.x, prev.y, p.x, p.y)) { addIfHit(); break; }
           }
+          prev = p;
+        }
+      } else {
+        const vStep = Math.max(1, Math.ceil(count / MAX_SAMPLES));
+        for (let i = 0; i < count; i += vStep) {
+          const p = project(i);
+          if (p.behind) continue;
+          if (p.x >= rx1 && p.x <= rx2 && p.y >= ry1 && p.y <= ry2) { addIfHit(); break; }
         }
       }
     }
-    if (obj.children && obj.children.length) {
-      for (const c of obj.children) visit(c);
-    }
+    if (obj.children) for (const c of obj.children) visit(c);
   };
   for (const c of scene.children) visit(c);
   return [...layers];
@@ -1081,13 +1205,13 @@ function pickLayersInBox(x1, y1, x2, y2) {
 ============================================================ */
 DOM.btnClickHide.addEventListener('click', () => {
   if (DOM.btnClickHide.disabled) return;
+  // Apagar modo pdfarea si estaba activo
+  if (pdfAreaMode) exitPdfAreaMode();
   clickHideMode = !clickHideMode;
   DOM.btnClickHide.classList.toggle('active', clickHideMode);
   DOM.btnClickHide.classList.toggle('active-danger', clickHideMode);
   DOM.canvasContainer.classList.toggle('mode-clickhide', clickHideMode);
-  if (clickHideMode) {
-    notificar('Clic sobre un objeto o arrastrá un cuadro para apagar su capa');
-  }
+  if (clickHideMode) notificar('Clic sobre un objeto o arrastrá un cuadro para apagar su capa');
 });
 
 let selState = null;
@@ -1095,7 +1219,7 @@ let selRectEl = null;
 
 DOM.viewerContainer.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
-  if (!clickHideMode) return;
+  if (!clickHideMode && !pdfAreaMode) return;
   e.stopPropagation();
   e.preventDefault();
   selState = { startX: e.clientX, startY: e.clientY, moved: false };
@@ -1108,7 +1232,7 @@ document.addEventListener('pointermove', (e) => {
   if (!selState.moved && Math.hypot(dx, dy) > 6) {
     selState.moved = true;
     selRectEl = document.createElement('div');
-    selRectEl.className = 'selection-rect';
+    selRectEl.className = 'selection-rect' + (pdfAreaMode ? ' pdf' : '');
     document.body.appendChild(selRectEl);
   }
   if (selState.moved && selRectEl) {
@@ -1128,8 +1252,26 @@ document.addEventListener('pointerup', (e) => {
   const start = selState;
   selState = null;
   if (selRectEl) { selRectEl.remove(); selRectEl = null; }
-  if (!clickHideMode) return;
   if (e.button !== 0) return;
+
+  // -------- Modo PDF área --------
+  if (pdfAreaMode) {
+    if (!start.moved) {
+      notificar('Arrastrá un rectángulo para definir el área', 'warn');
+      return;
+    }
+    const x1 = Math.min(start.startX, e.clientX);
+    const y1 = Math.min(start.startY, e.clientY);
+    const x2 = Math.max(start.startX, e.clientX);
+    const y2 = Math.max(start.startY, e.clientY);
+    exitPdfAreaMode();
+    generatePdfFromRegion(x1, y1, x2 - x1, y2 - y1);
+    return;
+  }
+
+  // -------- Modo apagar capa --------
+  if (!clickHideMode) return;
+  syncLayersStateFromScene();
 
   if (!start.moved) {
     const lname = pickLayerAtPoint(e.clientX, e.clientY);
@@ -1156,7 +1298,10 @@ document.addEventListener('pointerup', (e) => {
       changes.push({ name: lname, oldVisible: true, newVisible: false });
       info.visible = false;
     }
-    if (changes.length === 0) { notificar('Las capas del cuadro ya estaban ocultas', 'warn'); return; }
+    if (changes.length === 0) {
+      notificar(`Se tocaron ${layersInBox.length} capa(s) pero ya estaban ocultas`, 'warn');
+      return;
+    }
     setLayersVisible(changes.map(c => ({ name: c.name, show: false })));
     if (!undoing) {
       layerHistory.push(changes);
@@ -1164,9 +1309,160 @@ document.addEventListener('pointerup', (e) => {
       updateUndoUI();
     }
     renderLayers();
-    notificar(`${changes.length} capa(s) apagada(s) · ${layersInBox.length} detectada(s)`);
+    notificar(`${changes.length} capa(s) apagada(s)`);
   }
 }, true);
+
+/* ============================================================
+   PDF: carga de jsPDF bajo demanda
+============================================================ */
+async function getJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = () => {
+      if (window.jspdf && window.jspdf.jsPDF) resolve(window.jspdf.jsPDF);
+      else reject(new Error('jsPDF no cargó correctamente'));
+    };
+    s.onerror = () => reject(new Error('No se pudo descargar jsPDF'));
+    document.head.appendChild(s);
+  });
+}
+
+function captureFullCanvas() {
+  if (!viewer) return null;
+  try { viewer.Render(); } catch (e) {}
+  const canvas = viewer.GetCanvas();
+  if (!canvas) return null;
+  try {
+    return canvas.toDataURL('image/png');
+  } catch (e) {
+    console.warn('toDataURL falló:', e);
+    return null;
+  }
+}
+
+function captureCanvasRegion(clientX, clientY, clientW, clientH) {
+  if (!viewer) return null;
+  try { viewer.Render(); } catch (e) {}
+  const canvas = viewer.GetCanvas();
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  // Convertir coords cliente → coords pixel del canvas
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const px = Math.round(clientX * scaleX);
+  const py = Math.round(clientY * scaleY);
+  const pw = Math.round(clientW * scaleX);
+  const ph = Math.round(clientH * scaleY);
+  const cx = Math.max(0, Math.min(canvas.width - 1, px));
+  const cy = Math.max(0, Math.min(canvas.height - 1, py));
+  const cw = Math.max(1, Math.min(canvas.width - cx, pw));
+  const ch = Math.max(1, Math.min(canvas.height - cy, ph));
+  const out = document.createElement('canvas');
+  out.width = cw;
+  out.height = ch;
+  const ctx = out.getContext('2d');
+  // Fondo por las dudas (evita transparencia en zonas fuera de la escena)
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.drawImage(canvas, cx, cy, cw, ch, 0, 0, cw, ch);
+  try {
+    return out.toDataURL('image/png');
+  } catch (e) {
+    console.warn('toDataURL region falló:', e);
+    return null;
+  }
+}
+
+function buildPdfName(prefix) {
+  const base = stats.fileName ? stats.fileName.replace(/\.[^.]+$/, '') : 'plano';
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  return `${base}_${prefix}_${stamp}.pdf`;
+}
+
+async function generatePdfFromDataURL(dataURL, width, height, filename) {
+  if (!dataURL) { notificar('No se pudo capturar la vista', 'error'); return; }
+  try {
+    const jsPDF = await getJsPDF();
+    const pdf = new jsPDF({
+      orientation: width >= height ? 'landscape' : 'portrait',
+      unit: 'px',
+      format: [width, height],
+      hotfixes: ['px_scaling'],
+    });
+    pdf.addImage(dataURL, 'PNG', 0, 0, width, height, undefined, 'FAST');
+    pdf.save(filename);
+    notificar('PDF generado');
+  } catch (e) {
+    console.error(e);
+    notificar('Error al generar PDF: ' + (e.message || e), 'error');
+  }
+}
+
+async function generatePdfFullView() {
+  if (!viewer) return;
+  const canvas = viewer.GetCanvas();
+  if (!canvas) return;
+  const dataURL = captureFullCanvas();
+  if (!dataURL) { notificar('No se pudo capturar la vista', 'error'); return; }
+  await generatePdfFromDataURL(dataURL, canvas.width, canvas.height, buildPdfName('vista'));
+}
+
+async function generatePdfFromRegion(x, y, w, h) {
+  if (w < 20 || h < 20) { notificar('El área es demasiado pequeña', 'warn'); return; }
+  const dataURL = captureCanvasRegion(x, y, w, h);
+  if (!dataURL) { notificar('No se pudo capturar el área', 'error'); return; }
+  const canvas = viewer.GetCanvas();
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  await generatePdfFromDataURL(dataURL, Math.round(w * scaleX), Math.round(h * scaleY), buildPdfName('area'));
+}
+
+/* ============================================================
+   MENÚ PDF
+============================================================ */
+function togglePdfMenu() {
+  if (DOM.btnPdf.disabled) return;
+  DOM.pdfMenu.classList.toggle('activo');
+}
+DOM.btnPdf.addEventListener('click', (e) => {
+  e.stopPropagation();
+  togglePdfMenu();
+});
+document.addEventListener('click', (e) => {
+  if (!DOM.pdfMenu.classList.contains('activo')) return;
+  if (DOM.pdfMenu.contains(e.target) || DOM.btnPdf.contains(e.target)) return;
+  DOM.pdfMenu.classList.remove('activo');
+});
+
+DOM.pdfOptVisible.addEventListener('click', () => {
+  DOM.pdfMenu.classList.remove('activo');
+  generatePdfFullView();
+});
+
+DOM.pdfOptArea.addEventListener('click', () => {
+  DOM.pdfMenu.classList.remove('activo');
+  enterPdfAreaMode();
+});
+
+function enterPdfAreaMode() {
+  if (clickHideMode) {
+    clickHideMode = false;
+    DOM.btnClickHide.classList.remove('active', 'active-danger');
+    DOM.canvasContainer.classList.remove('mode-clickhide');
+  }
+  pdfAreaMode = true;
+  DOM.canvasContainer.classList.add('mode-pdfarea');
+  notificar('Arrastrá un rectángulo sobre el plano para exportar ese sector');
+}
+
+function exitPdfAreaMode() {
+  pdfAreaMode = false;
+  DOM.canvasContainer.classList.remove('mode-pdfarea');
+}
 
 /* ============================================================
    CARGA DE ARCHIVO
@@ -1183,10 +1479,11 @@ async function processFile(file) {
   DOM.loadingLabel.textContent = 'Preparando motor de conversión…';
   DOM.loadingSub.textContent = 'La primera vez puede tardar unos segundos.';
   DOM.btnOpen.disabled = true;
-  DOM.btnScreenshot.disabled = true;
+  DOM.btnPdf.disabled = true;
   DOM.btnZoomIn.disabled = true;
   DOM.btnZoomOut.disabled = true;
   DOM.btnFit.disabled = true;
+  DOM.btnRegen.disabled = true;
   DOM.btnClickHide.disabled = true;
   setStatus('Procesando ' + file.name);
 
@@ -1195,7 +1492,6 @@ async function processFile(file) {
       await init({ wasmBase: CDN_WASM_BASE });
       wasmReady = true;
     }
-
     DOM.loadingLabel.textContent = 'Leyendo archivo DWG…';
     const buf = await file.arrayBuffer();
     const dwgBytes = new Uint8Array(buf);
@@ -1211,9 +1507,6 @@ async function processFile(file) {
     DOM.loadingLabel.textContent = 'Renderizando dibujo…';
     DOM.loadingSub.textContent = 'Optimizando geometría para WebGL.';
     initViewer();
-
-    // Reset cache de picking al cargar nuevo archivo
-    worldPositionsCache = new WeakMap();
 
     const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
     const dxfUrl = URL.createObjectURL(dxfBlob);
@@ -1231,6 +1524,7 @@ async function processFile(file) {
         layersState.set(L.name, { color: L.color, visible: true });
       }
     } catch (e) { console.warn('No se pudieron leer capas:', e); }
+    syncLayersStateFromScene();
     renderLayers();
 
     stats.fileSize = file.size;
@@ -1251,10 +1545,11 @@ async function processFile(file) {
       DOM.extentsVal.textContent = `${fmtNum(w)} × ${fmtNum(h)} m`;
     }
 
-    DOM.btnScreenshot.disabled = false;
+    DOM.btnPdf.disabled = false;
     DOM.btnZoomIn.disabled = false;
     DOM.btnZoomOut.disabled = false;
     DOM.btnFit.disabled = false;
+    DOM.btnRegen.disabled = false;
     setStatus(`Listo · ${stats.entityCount.toLocaleString('es')} entidades · ${layersState.size} capas`);
     notificar('Dibujo cargado correctamente');
     if (fonts.length === 0) {
@@ -1318,29 +1613,7 @@ DOM.btnSidebarToggle.addEventListener('click', () => {
   DOM.sidePanel.classList.toggle('colapsado');
   setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 240);
 });
-if (window.innerWidth <= 768) DOM.sidePanel.classList.add('colapsado');
-
-/* ============================================================
-   CAPTURA PNG
-============================================================ */
-DOM.btnScreenshot.addEventListener('click', () => {
-  try {
-    const canvas = viewer?.GetCanvas?.();
-    if (!canvas) { notificar('No hay dibujo para capturar', 'error'); return; }
-    canvas.toBlob((blob) => {
-      if (!blob) { notificar('No se pudo generar la captura', 'error'); return; }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `visordwg_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-      notificar('Captura descargada');
-    }, 'image/png');
-  } catch (e) {
-    notificar('Error al capturar: ' + e.message, 'error');
-  }
-});
+if (window.innerWidth <= 900) DOM.sidePanel.classList.add('colapsado');
 
 /* ============================================================
    INFO CARD
@@ -1367,26 +1640,29 @@ window.addEventListener('keydown', (e) => {
     else notificar('Nada para deshacer', 'warn');
     return;
   }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); openFileDialog(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
     e.preventDefault();
+    if (!DOM.btnPdf.disabled) { DOM.pdfMenu.classList.remove('activo'); generatePdfFullView(); }
     return;
-  }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
-    e.preventDefault(); openFileDialog(); return;
   }
   if (e.ctrlKey || e.metaKey) return;
 
   if (e.key === 'Escape') {
     DOM.infoCard.classList.remove('activo');
+    DOM.pdfMenu.classList.remove('activo');
     if (clickHideMode) {
       clickHideMode = false;
       DOM.btnClickHide.classList.remove('active', 'active-danger');
       DOM.canvasContainer.classList.remove('mode-clickhide');
     }
+    if (pdfAreaMode) exitPdfAreaMode();
   }
   if (e.key.toLowerCase() === 'g') { gridVisible = !gridVisible; applyGrid(); }
   if (e.key.toLowerCase() === 'h') { if (!DOM.btnClickHide.disabled) DOM.btnClickHide.click(); }
   if (e.key.toLowerCase() === 'f') { if (!DOM.btnFit.disabled) fitView(); }
+  if (e.key.toLowerCase() === 'r') { if (!DOM.btnRegen.disabled) regen(); }
   if (e.key === '+' || e.key === '=') { if (!DOM.btnZoomIn.disabled) zoomIn(); }
   if (e.key === '-' || e.key === '_') { if (!DOM.btnZoomOut.disabled) zoomOut(); }
 });
