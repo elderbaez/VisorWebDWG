@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TopoView · Visor DWG Profesional</title>
+<title>Visor web DWG</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -91,7 +91,6 @@ body {
   border: 1px solid var(--border);
 }
 
-/* File info */
 .file-info-card {
   background: var(--panel-card); border: 1px solid var(--border);
   border-radius: var(--radius-md); padding: 0.85rem;
@@ -101,11 +100,10 @@ body {
   font-size: 0.825rem; font-weight: 700; color: var(--text-main);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.file-info-meta { font-size: 0.7rem; color: var(--text-secondary); display: flex; gap: 0.75rem; }
+.file-info-meta { font-size: 0.7rem; color: var(--text-secondary); display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .file-info-meta span { display: inline-flex; align-items: center; gap: 4px; }
 .file-info-meta b { color: var(--accent); font-weight: 700; }
 
-/* Layers */
 .layer-list { display: flex; flex-direction: column; gap: 2px; }
 .layer-item {
   display: flex; align-items: center; gap: 0.6rem;
@@ -126,16 +124,11 @@ body {
   flex: 1; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; min-width: 0;
 }
-.layer-name small {
-  display: block; font-size: 0.65rem; font-weight: 500;
-  color: var(--text-dim); margin-top: 1px;
-}
 .layer-empty {
   font-size: 0.75rem; color: var(--text-dim); text-align: center;
   padding: 1rem 0.5rem; line-height: 1.5; font-weight: 500;
 }
 
-/* Quick actions in panel */
 .quick-actions { display: flex; flex-direction: column; gap: 0.5rem; }
 .btn-panel {
   display: flex; align-items: center; gap: 0.6rem; width: 100%;
@@ -154,6 +147,17 @@ body {
   overflow: hidden; min-width: 0; min-height: 0;
 }
 #viewer-container { width: 100%; height: 100%; position: absolute; inset: 0; }
+
+/* Grid overlay (activo por defecto) */
+.grid-overlay {
+  position: absolute; inset: 0; pointer-events: none; z-index: 6;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: 0 0;
+}
+.grid-overlay.oculto { display: none; }
 
 /* Empty state */
 .empty-state {
@@ -177,16 +181,14 @@ body {
   padding: 0.3rem 0.75rem; border: 1px dashed var(--border);
   border-radius: 20px; letter-spacing: 0.03em;
 }
-.empty-state .open-btn {
-  pointer-events: auto; margin-top: 0.5rem;
-}
+.empty-state .open-btn { pointer-events: auto; margin-top: 0.5rem; }
 
 /* Drag overlay */
 .drag-overlay {
   position: absolute; inset: 0; z-index: 100; display: none;
   align-items: center; justify-content: center; flex-direction: column; gap: 0.75rem;
   background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(8px);
-  border: 2px dashed var(--accent); border-radius: 0;
+  border: 2px dashed var(--accent);
   color: var(--text-main); font-weight: 700; font-size: 0.95rem;
   pointer-events: none;
 }
@@ -198,7 +200,6 @@ body {
   position: absolute; inset: 0; z-index: 90; display: none;
   align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
   background: rgba(13, 17, 23, 0.85); backdrop-filter: blur(6px);
-  pointer-events: auto;
 }
 .loading-overlay.activo { display: flex; }
 .spinner {
@@ -210,6 +211,9 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-label { font-size: 0.825rem; color: var(--text-secondary); font-weight: 600; letter-spacing: 0.02em; }
 .loading-sub { font-size: 0.7rem; color: var(--text-dim); font-weight: 500; max-width: 340px; text-align: center; }
+
+/* Cursor para modo apagar capa */
+.canvas-container.mode-clickhide #viewer-container { cursor: crosshair; }
 
 /* Info FAB */
 .info-fab {
@@ -264,10 +268,11 @@ body {
   padding: 0 1rem; font-size: 0.72rem; font-weight: 500;
   color: var(--text-secondary); z-index: 50; flex-shrink: 0;
 }
-.status-left { display: flex; gap: 1.25rem; align-items: center; }
-.status-left span { display: inline-flex; align-items: center; gap: 6px; }
+.status-left { display: flex; gap: 1.5rem; align-items: center; overflow: hidden; }
+.status-left span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .status-left b { color: var(--text-main); font-weight: 700; }
-.status-right { display: flex; gap: 0.35rem; align-items: center; }
+.status-coords { color: var(--accent); font-variant-numeric: tabular-nums; }
+.status-right { display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0; }
 .cad-tool-btn {
   background: transparent; border: none; color: var(--text-secondary);
   cursor: pointer; padding: 3px 8px; border-radius: 4px;
@@ -277,6 +282,7 @@ body {
 }
 .cad-tool-btn:hover { background: var(--border); color: var(--text-main); }
 .cad-tool-btn.active { background: var(--accent); color: #fff; }
+.cad-tool-btn.active-danger { background: var(--danger); color: #fff; }
 .cad-tool-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; }
 
 /* Notification */
@@ -296,7 +302,9 @@ body {
   .btn-sidebar-toggle { display: inline-flex; }
   .side-panel {
     position: absolute; top: 0; left: 0; bottom: 0; z-index: 500;
-    box-shadow: 6px 0 20px rgba(0,0,0,0.55); transform: translateX(0); margin-left: 0;
+    box-shadow: 6px 0 20px rgba(0,0,0,0.55);
+    transform: translateX(0); margin-left: 0;
+    width: 280px;
   }
   .side-panel.colapsado { transform: translateX(-100%); margin-left: 0; }
   .viewer-top-bar { padding: 0.55rem 0.75rem; gap: 0.4rem; }
@@ -315,6 +323,7 @@ body {
 <body>
 
 <div id="pantalla-visor">
+
   <!-- ============ TOP BAR ============ -->
   <div class="viewer-top-bar">
     <div style="display: flex; align-items: center; gap: 0.6rem;">
@@ -323,8 +332,8 @@ body {
       </button>
       <div class="app-title">
         <svg class="app-logo-svg" viewBox="0 0 24 24"><path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z"/></svg>
-        <span>TopoView</span>
-        <span class="app-subtitle">Visor DWG</span>
+        <span>Visor web DWG</span>
+        <span class="app-subtitle">Profesional</span>
       </div>
     </div>
     <div class="viewer-actions">
@@ -341,7 +350,6 @@ body {
 
   <!-- ============ BODY ============ -->
   <div class="viewer-body">
-    <!-- Side panel -->
     <div class="side-panel" id="sidePanel">
       <div class="panel-section" id="sectionFile" style="display: none;">
         <div class="section-header">
@@ -353,6 +361,9 @@ body {
           <div class="file-info-meta">
             <span>Tamaño: <b id="fileSize">—</b></span>
             <span>Entidades: <b id="entCount">—</b></span>
+          </div>
+          <div class="file-info-meta" id="extentsRow" style="display:none;">
+            <span>Extensión: <b id="extentsVal">—</b></span>
           </div>
         </div>
       </div>
@@ -370,14 +381,10 @@ body {
 
       <div class="panel-section">
         <div class="section-header">
-          <svg viewBox="0 0 24 24" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          <svg viewBox="0 0 24 24" stroke-width="1.75"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           Acciones
         </div>
         <div class="quick-actions">
-          <button class="btn-panel" id="btnFitView" disabled>
-            <svg viewBox="0 0 24 24" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-            Ajustar a pantalla
-          </button>
           <button class="btn-panel" id="btnToggleAll" disabled>
             <svg viewBox="0 0 24 24" stroke-width="1.75"><polyline points="20 6 9 17 4 12"/></svg>
             <span id="txtToggleAll">Ocultar todas las capas</span>
@@ -386,12 +393,11 @@ body {
       </div>
     </div>
 
-    <!-- Main area -->
     <div class="main-area">
       <div class="canvas-container" id="canvasContainer">
         <div id="viewer-container"></div>
+        <div class="grid-overlay" id="gridOverlay"></div>
 
-        <!-- Empty state -->
         <div class="empty-state" id="emptyState">
           <div class="empty-state-icon">
             <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -401,7 +407,7 @@ body {
               <line x1="9" y1="17" x2="15" y2="17"/>
             </svg>
           </div>
-          <h2>Visor DWG profesional</h2>
+          <h2>Visor web DWG</h2>
           <p>Arrastrá un archivo <b>.dwg</b> aquí o abrí uno desde tu equipo para verlo al instante. Compatible con versiones R13 a R2018.</p>
           <button class="btn btn-accent open-btn" id="btnOpenEmpty">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
@@ -410,7 +416,6 @@ body {
           <span class="drop-hint">También podés soltar el archivo en cualquier parte</span>
         </div>
 
-        <!-- Drag overlay -->
         <div class="drag-overlay" id="dragOverlay">
           <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
@@ -420,14 +425,12 @@ body {
           <div>Soltá el archivo para abrirlo</div>
         </div>
 
-        <!-- Loading overlay -->
         <div class="loading-overlay" id="loadingOverlay">
           <div class="spinner"></div>
           <div class="loading-label" id="loadingLabel">Procesando archivo…</div>
           <div class="loading-sub" id="loadingSub">Esto puede tardar unos segundos en dibujos grandes.</div>
         </div>
 
-        <!-- Info FAB -->
         <button class="info-fab" id="infoFab" title="Información de contacto">
           <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         </button>
@@ -456,7 +459,10 @@ body {
   <div class="viewer-status-bar">
     <div class="status-left">
       <span id="statusState">Sin archivo cargado</span>
-      <span style="display:none;" id="statusCoords">Coordenadas: <b id="statusXY">—</b></span>
+      <span class="status-coords" id="statusCoords" style="display: none;">
+        <span id="statusX">X: 0.00 m</span>
+        <span id="statusY">Y: 0.00 m</span>
+      </span>
     </div>
     <div class="status-right">
       <button class="cad-tool-btn" id="btnZoomIn" title="Acercar" disabled>
@@ -468,6 +474,14 @@ body {
       <button class="cad-tool-btn" id="btnFit" title="Ajustar a pantalla" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3"/><path d="M21 8V5a2 2 0 00-2-2h-3"/><path d="M3 16v3a2 2 0 002 2h3"/><path d="M16 21h3a2 2 0 002-2v-3"/></svg>
         <span>Ajustar</span>
+      </button>
+      <button class="cad-tool-btn active" id="btnGrid" title="Mostrar/ocultar cuadrícula">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+        <span>Cuadrícula</span>
+      </button>
+      <button class="cad-tool-btn" id="btnClickHide" title="Apagar capa haciendo clic sobre el objeto" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+        <span>Apagar capa</span>
       </button>
     </div>
   </div>
@@ -500,23 +514,27 @@ const DOM = {
   btnOpenEmpty: document.getElementById('btnOpenEmpty'),
   btnScreenshot: document.getElementById('btnScreenshot'),
   btnSidebarToggle: document.getElementById('btnSidebarToggle'),
-  btnFitView: document.getElementById('btnFitView'),
   btnToggleAll: document.getElementById('btnToggleAll'),
   txtToggleAll: document.getElementById('txtToggleAll'),
   btnZoomIn: document.getElementById('btnZoomIn'),
   btnZoomOut: document.getElementById('btnZoomOut'),
   btnFit: document.getElementById('btnFit'),
+  btnGrid: document.getElementById('btnGrid'),
+  btnClickHide: document.getElementById('btnClickHide'),
   fileInput: document.getElementById('fileInput'),
   sidePanel: document.getElementById('sidePanel'),
   sectionFile: document.getElementById('sectionFile'),
   fileName: document.getElementById('fileName'),
   fileSize: document.getElementById('fileSize'),
   entCount: document.getElementById('entCount'),
+  extentsRow: document.getElementById('extentsRow'),
+  extentsVal: document.getElementById('extentsVal'),
   layerList: document.getElementById('layerList'),
   layerEmpty: document.getElementById('layerEmpty'),
   layerCount: document.getElementById('layerCount'),
   canvasContainer: document.getElementById('canvasContainer'),
   viewerContainer: document.getElementById('viewer-container'),
+  gridOverlay: document.getElementById('gridOverlay'),
   emptyState: document.getElementById('emptyState'),
   dragOverlay: document.getElementById('dragOverlay'),
   loadingOverlay: document.getElementById('loadingOverlay'),
@@ -526,7 +544,8 @@ const DOM = {
   infoCard: document.getElementById('infoCard'),
   statusState: document.getElementById('statusState'),
   statusCoords: document.getElementById('statusCoords'),
-  statusXY: document.getElementById('statusXY'),
+  statusX: document.getElementById('statusX'),
+  statusY: document.getElementById('statusY'),
 };
 
 /* ============================================================
@@ -534,9 +553,12 @@ const DOM = {
 ============================================================ */
 let viewer = null;
 let wasmReady = false;
-let layersState = new Map(); // name -> { color, visible }
-let stats = { fileSize: 0, fileName: '', entityCount: 0, layerCount: 0 };
-const SCREENSHOT_NAME = () => `topoview_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
+let layersState = new Map();      // name -> { color, visible }
+let drawingBounds = null;         // { minX, maxX, minY, maxY }
+let clickHideMode = false;
+let gridVisible = true;           // activo por defecto
+const stats = { fileSize: 0, fileName: '', entityCount: 0, layerCount: 0 };
+const SCREENSHOT_NAME = () => `visordwg_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
 
 /* ============================================================
    UTILS
@@ -545,6 +567,13 @@ function fmtBytes(b) {
   if (b < 1024) return b + ' B';
   if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
   return (b / 1048576).toFixed(2) + ' MB';
+}
+function fmtNum(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1e6) return n.toFixed(0);
+  if (abs >= 1000) return n.toFixed(2);
+  if (abs >= 1) return n.toFixed(2);
+  return n.toFixed(3);
 }
 function numToHex(c) {
   return '#' + (c >>> 0).toString(16).padStart(6, '0').slice(-6);
@@ -563,9 +592,7 @@ function notificar(msg, tipo = 'ok') {
 function setStatus(text) { DOM.statusState.textContent = text; }
 
 /* ============================================================
-   CARGA DE FUENTES ROBUSTA
-   Probamos varias URLs; validamos la firma binaria TTF/OTF.
-   Si ninguna carga, devolvemos [] y el visor no rompe.
+   FUENTES ROBUSTAS (ya validado)
 ============================================================ */
 async function loadValidFonts(urls) {
   const valid = [];
@@ -577,29 +604,22 @@ async function loadValidFonts(urls) {
       if (buf.byteLength < 12) continue;
       const view = new DataView(buf);
       const sig = view.getUint32(0, false);
-      // Firma TrueType (0x00010000) o OpenType con curvas CFF (0x4F54544F "OTTO")
-      // también aceptamos 'true' (0x74727565) y 'ttcf' (0x74746366) para colecciones
       const ok =
-        sig === 0x00010000 ||
-        sig === 0x4F54544F ||
-        sig === 0x74727565 ||
-        sig === 0x74746366;
+        sig === 0x00010000 || sig === 0x4F54544F ||
+        sig === 0x74727565 || sig === 0x74746366;
       if (!ok) continue;
       const blob = new Blob([buf], { type: 'font/ttf' });
       valid.push(URL.createObjectURL(blob));
-    } catch (e) { /* ignorar */ }
+    } catch (e) {}
   }
   return valid;
 }
-
 const FONT_CANDIDATES = [
   'https://cdn.jsdelivr.net/npm/@expo-google-fonts/roboto@0.2.3/Roboto_400Regular.ttf',
-  'https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-400-normal.woff2',
   'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Regular.ttf',
   'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf',
   'https://cdn.jsdelivr.net/gh/googlefonts/roboto@main/src/hinted/Roboto-Regular.ttf',
 ];
-
 let cachedFonts = null;
 async function getFonts() {
   if (cachedFonts) return cachedFonts;
@@ -608,7 +628,31 @@ async function getFonts() {
 }
 
 /* ============================================================
-   INICIALIZAR VISOR
+   BOUNDS DEL DXF (códigos 10 y 20)
+============================================================ */
+function computeDxfBounds(text) {
+  const lines = text.split(/\r?\n/);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < lines.length - 1; i++) {
+    const code = lines[i].trim();
+    if (code === '10' || code === '20') {
+      const val = parseFloat(lines[i + 1]);
+      if (!isFinite(val)) continue;
+      if (code === '10') {
+        if (val < minX) minX = val;
+        if (val > maxX) maxX = val;
+      } else {
+        if (val < minY) minY = val;
+        if (val > maxY) maxY = val;
+      }
+    }
+  }
+  if (!isFinite(minX) || !isFinite(minY)) return null;
+  return { minX, maxX, minY, maxY };
+}
+
+/* ============================================================
+   VISOR
 ============================================================ */
 function initViewer() {
   if (viewer) {
@@ -623,7 +667,90 @@ function initViewer() {
 }
 
 /* ============================================================
-   RENDERIZAR PANEL DE CAPAS
+   TOGGLE DE CAPAS — implementación defensiva
+   - Guarda y restaura la cámara por si el visor la resetea.
+   - Intenta varias APIs: ShowLayer, SetLayerVisible, propiedad .visible.
+   - Fuerza re-render con un pequeño nudge.
+============================================================ */
+function setLayerVisible(layerName, visible) {
+  if (!viewer) return;
+
+  // Guardar estado de cámara
+  let camState = null;
+  try {
+    const cam = viewer.camera || viewer._camera;
+    const ctrl = viewer.controls || viewer._controls;
+    if (cam && cam.position) {
+      camState = {
+        px: cam.position.x, py: cam.position.y, pz: cam.position.z,
+        tx: ctrl && ctrl.target ? ctrl.target.x : null,
+        ty: ctrl && ctrl.target ? ctrl.target.y : null,
+        tz: ctrl && ctrl.target ? ctrl.target.z : null,
+      };
+    }
+  } catch (e) {}
+
+  let ok = false;
+  // Intento 1: ShowLayer(name, visible)
+  try {
+    if (typeof viewer.ShowLayer === 'function') {
+      viewer.ShowLayer(layerName, !!visible);
+      ok = true;
+    }
+  } catch (e1) {
+    console.warn('ShowLayer falló, probando alternativas:', e1);
+  }
+
+  // Intento 2: SetLayerVisible(name, visible)
+  if (!ok) {
+    try {
+      if (typeof viewer.SetLayerVisible === 'function') {
+        viewer.SetLayerVisible(layerName, !!visible);
+        ok = true;
+      }
+    } catch (e2) { /* silencioso */ }
+  }
+
+  // Intento 3: buscar el layer object y togglear .visible
+  if (!ok) {
+    try {
+      if (typeof viewer.GetLayers === 'function') {
+        const it = viewer.GetLayers();
+        for (const L of it) {
+          if (L && L.name === layerName) {
+            L.visible = !!visible;
+            if (typeof L.Show === 'function') L.Show(visible);
+            ok = true;
+            break;
+          }
+        }
+      }
+    } catch (e3) { /* silencioso */ }
+  }
+
+  // Restaurar cámara si es posible
+  if (camState) {
+    try {
+      const cam = viewer.camera || viewer._camera;
+      const ctrl = viewer.controls || viewer._controls;
+      if (cam && cam.position) {
+        cam.position.set(camState.px, camState.py, camState.pz);
+        if (ctrl && ctrl.target && camState.tx !== null) {
+          ctrl.target.set(camState.tx, camState.ty, camState.tz);
+          if (typeof ctrl.update === 'function') ctrl.update();
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Nudge para forzar un re-render
+  requestAnimationFrame(() => {
+    try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+  });
+}
+
+/* ============================================================
+   RENDER DEL PANEL DE CAPAS
 ============================================================ */
 function renderLayers() {
   DOM.layerList.innerHTML = '';
@@ -632,13 +759,14 @@ function renderLayers() {
     DOM.layerEmpty.style.display = '';
     DOM.layerCount.textContent = '0';
     DOM.btnToggleAll.disabled = true;
+    DOM.btnClickHide.disabled = true;
     return;
   }
   DOM.layerEmpty.style.display = 'none';
   DOM.layerCount.textContent = String(layersState.size);
   DOM.btnToggleAll.disabled = false;
+  DOM.btnClickHide.disabled = false;
 
-  // Ordenar: primero las visibles, luego por nombre
   const entries = [...layersState.entries()].sort((a, b) => {
     if (a[1].visible !== b[1].visible) return a[1].visible ? -1 : 1;
     return a[0].localeCompare(b[0]);
@@ -653,7 +781,7 @@ function renderLayers() {
     cb.checked = info.visible;
     cb.addEventListener('change', () => {
       info.visible = cb.checked;
-      try { viewer.ShowLayer(name, cb.checked); } catch (e) { console.warn(e); }
+      setLayerVisible(name, cb.checked);
       updateToggleAllLabel();
     });
 
@@ -673,17 +801,17 @@ function renderLayers() {
   }
   updateToggleAllLabel();
 }
-
 function updateToggleAllLabel() {
   const total = layersState.size;
   const visibles = [...layersState.values()].filter(v => v.visible).length;
-  DOM.txtToggleAll.textContent = visibles === 0 ? 'Mostrar todas las capas'
-    : visibles === total ? 'Ocultar todas las capas'
-    : `Alternar visibilidad (${visibles}/${total})`;
+  DOM.txtToggleAll.textContent =
+    visibles === 0 ? 'Mostrar todas las capas' :
+    visibles === total ? 'Ocultar todas las capas' :
+    `Alternar visibilidad (${visibles}/${total})`;
 }
 
 /* ============================================================
-   PROCESO PRINCIPAL: DWG -> DXF -> RENDER
+   PROCESO PRINCIPAL
 ============================================================ */
 async function processFile(file) {
   if (!file) return;
@@ -692,21 +820,19 @@ async function processFile(file) {
     return;
   }
 
-  // Reset estado
   DOM.emptyState.classList.add('hidden');
   DOM.loadingOverlay.classList.add('activo');
   DOM.loadingLabel.textContent = 'Preparando motor de conversión…';
   DOM.loadingSub.textContent = 'La primera vez puede tardar unos segundos.';
   DOM.btnOpen.disabled = true;
   DOM.btnScreenshot.disabled = true;
-  DOM.btnFitView.disabled = true;
   DOM.btnZoomIn.disabled = true;
   DOM.btnZoomOut.disabled = true;
   DOM.btnFit.disabled = true;
+  DOM.btnClickHide.disabled = true;
   setStatus('Procesando ' + file.name);
 
   try {
-    // 1. Inicializar WASM (solo la primera vez)
     if (!wasmReady) {
       await init({ wasmBase: CDN_WASM_BASE });
       wasmReady = true;
@@ -716,59 +842,60 @@ async function processFile(file) {
     const buf = await file.arrayBuffer();
     const dwgBytes = new Uint8Array(buf);
 
-    // 2. Convertir a DXF
     DOM.loadingLabel.textContent = 'Convirtiendo DWG a DXF…';
     DOM.loadingSub.textContent = 'Esto se ejecuta por completo en tu navegador.';
     const dxfBytes = await convertDwgToDxf(dwgBytes);
     const dxfText = new TextDecoder().decode(dxfBytes);
 
-    // 3. Cargar fuentes (cacheadas)
+    // Calcular extensión del dibujo
+    drawingBounds = computeDxfBounds(dxfText);
+
     DOM.loadingLabel.textContent = 'Cargando tipografías…';
     const fonts = await getFonts();
 
-    // 4. Crear visor y cargar DXF
     DOM.loadingLabel.textContent = 'Renderizando dibujo…';
     DOM.loadingSub.textContent = 'Optimizando geometría para WebGL.';
     initViewer();
 
     const dxfBlob = new Blob([dxfText], { type: 'text/plain' });
     const dxfUrl = URL.createObjectURL(dxfBlob);
-
     const loadOpts = { url: dxfUrl };
     if (fonts.length > 0) loadOpts.fonts = fonts;
-
     await viewer.Load(loadOpts);
     URL.revokeObjectURL(dxfUrl);
 
-    // 5. Extraer capas
+    // Capas
     layersState.clear();
     try {
       const layers = viewer.GetLayers();
       for (const L of layers) {
+        if (!L || typeof L.name !== 'string') continue;
         layersState.set(L.name, { color: L.color, visible: true });
       }
     } catch (e) { console.warn('No se pudieron leer capas:', e); }
     renderLayers();
 
-    // 6. Actualizar stats
+    // Stats
     stats.fileSize = file.size;
     stats.fileName = file.name;
     DOM.fileName.textContent = file.name;
     DOM.fileName.title = file.name;
     DOM.fileSize.textContent = fmtBytes(file.size);
-    // Aproximamos entidades por líneas del DXF
     const entMatch = dxfText.match(/\n\s*0\s*\n/g);
     stats.entityCount = entMatch ? entMatch.length : 0;
     DOM.entCount.textContent = stats.entityCount.toLocaleString('es');
     DOM.sectionFile.style.display = '';
+    if (drawingBounds) {
+      const w = drawingBounds.maxX - drawingBounds.minX;
+      const h = drawingBounds.maxY - drawingBounds.minY;
+      DOM.extentsRow.style.display = '';
+      DOM.extentsVal.textContent = `${fmtNum(w)} × ${fmtNum(h)} m`;
+    }
 
-    // 7. Habilitar botones
     DOM.btnScreenshot.disabled = false;
-    DOM.btnFitView.disabled = false;
     DOM.btnZoomIn.disabled = false;
     DOM.btnZoomOut.disabled = false;
     DOM.btnFit.disabled = false;
-
     setStatus(`Listo · ${stats.entityCount.toLocaleString('es')} entidades · ${layersState.size} capas`);
     notificar('Dibujo cargado correctamente');
     if (fonts.length === 0) {
@@ -778,7 +905,7 @@ async function processFile(file) {
     console.error(err);
     notificar('Error al procesar el archivo: ' + (err.message || err), 'error');
     setStatus('Error al procesar el archivo');
-    if (!viewer) DOM.emptyState.classList.remove('hidden');
+    DOM.emptyState.classList.remove('hidden');
   } finally {
     DOM.loadingOverlay.classList.remove('activo');
     DOM.btnOpen.disabled = false;
@@ -786,7 +913,7 @@ async function processFile(file) {
 }
 
 /* ============================================================
-   EVENTOS: ABRIR / DRAG & DROP
+   ABRIR / DRAG & DROP
 ============================================================ */
 function openFileDialog() { DOM.fileInput.click(); }
 DOM.btnOpen.addEventListener('click', openFileDialog);
@@ -797,12 +924,11 @@ DOM.fileInput.addEventListener('change', (e) => {
   e.target.value = '';
 });
 
-// Drag & drop
 let dragCounter = 0;
 ['dragenter', 'dragover'].forEach(ev => {
   window.addEventListener(ev, (e) => {
     e.preventDefault();
-    if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
+    if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
       dragCounter++;
       DOM.dragOverlay.classList.add('activo');
     }
@@ -827,39 +953,66 @@ window.addEventListener('drop', (e) => {
 });
 
 /* ============================================================
-   ACCIONES DEL PANEL Y STATUS BAR
+   PANEL LATERAL (auto-colapso en móvil)
 ============================================================ */
 DOM.btnSidebarToggle.addEventListener('click', () => {
   DOM.sidePanel.classList.toggle('colapsado');
-  setTimeout(() => { if (viewer) viewer.Resize && viewer.Resize(); }, 240);
+  setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch(e){} }, 240);
 });
+// Auto-colapso en móvil al cargar
+if (window.innerWidth <= 768) {
+  DOM.sidePanel.classList.add('colapsado');
+}
 
-DOM.btnFitView.addEventListener('click', () => {
-  try { viewer.FitView(); } catch (e) { console.warn(e); }
+/* ============================================================
+   CUADRÍCULA (activa por defecto)
+============================================================ */
+function applyGrid() {
+  if (gridVisible) {
+    DOM.gridOverlay.classList.remove('oculto');
+    DOM.btnGrid.classList.add('active');
+  } else {
+    DOM.gridOverlay.classList.add('oculto');
+    DOM.btnGrid.classList.remove('active');
+  }
+}
+DOM.btnGrid.addEventListener('click', () => {
+  gridVisible = !gridVisible;
+  applyGrid();
 });
+applyGrid();
+
+/* ============================================================
+   ZOOM / FIT
+============================================================ */
 DOM.btnFit.addEventListener('click', () => {
   try { viewer.FitView(); } catch (e) { console.warn(e); }
 });
-
 DOM.btnZoomIn.addEventListener('click', () => {
-  try { viewer.ZoomIn && viewer.ZoomIn(); } catch (e) {}
+  try { if (viewer.ZoomIn) viewer.ZoomIn(); } catch (e) {}
 });
 DOM.btnZoomOut.addEventListener('click', () => {
-  try { viewer.ZoomOut && viewer.ZoomOut(); } catch (e) {}
+  try { if (viewer.ZoomOut) viewer.ZoomOut(); } catch (e) {}
 });
 
+/* ============================================================
+   TOGGLE-ALL
+============================================================ */
 DOM.btnToggleAll.addEventListener('click', () => {
   const total = layersState.size;
   const visibles = [...layersState.values()].filter(v => v.visible).length;
-  const target = visibles > 0 ? false : true; // si hay visibles, ocultamos todas; si no, mostramos
+  const target = visibles === 0;
   for (const [name, info] of layersState) {
     info.visible = target;
-    try { viewer.ShowLayer(name, target); } catch (e) {}
+    setLayerVisible(name, target);
   }
   renderLayers();
   notificar(target ? 'Todas las capas visibles' : 'Todas las capas ocultas');
 });
 
+/* ============================================================
+   CAPTURA PNG
+============================================================ */
 DOM.btnScreenshot.addEventListener('click', () => {
   try {
     const canvas = DOM.viewerContainer.querySelector('canvas');
@@ -892,15 +1045,134 @@ document.addEventListener('click', (e) => {
 });
 
 /* ============================================================
-   COORDENADAS DE MOUSE (aprox: 0..100% del viewport)
+   MODO APAGAR CAPA POR CLIC
+============================================================ */
+DOM.btnClickHide.addEventListener('click', () => {
+  if (DOM.btnClickHide.disabled) return;
+  clickHideMode = !clickHideMode;
+  DOM.btnClickHide.classList.toggle('active', clickHideMode);
+  DOM.btnClickHide.classList.toggle('active-danger', clickHideMode);
+  DOM.canvasContainer.classList.toggle('mode-clickhide', clickHideMode);
+  if (clickHideMode) {
+    notificar('Modo activo: hacé clic sobre un objeto para ocultar su capa');
+  }
+});
+
+// Detección de click vs drag
+let mouseDownPos = null;
+DOM.viewerContainer.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  mouseDownPos = { x: e.clientX, y: e.clientY };
+});
+DOM.viewerContainer.addEventListener('mouseup', (e) => {
+  if (!mouseDownPos || e.button !== 0) { mouseDownPos = null; return; }
+  const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+  mouseDownPos = null;
+  if (dist > 5) return;           // fue un drag (rotación/pan)
+  if (!clickHideMode || !viewer) return;
+  intentarApagarCapaEnPunto(e.clientX, e.clientY);
+});
+
+async function intentarApagarCapaEnPunto(clientX, clientY) {
+  try {
+    // Método 1: si el visor expone picking de entidades
+    const picks = ['GetEntityAt', 'PickEntity', 'GetEntityFromPoint'];
+    for (const m of picks) {
+      if (typeof viewer[m] === 'function') {
+        try {
+          const ent = viewer[m](clientX, clientY);
+          const lname = ent && (ent.layer?.name || ent.layer || ent.Layer);
+          if (lname) { ocultarCapaPorNombre(lname); return; }
+        } catch (e) { /* siguiente */ }
+      }
+    }
+
+    // Método 2: raycast contra la escena de Three.js
+    const scene = viewer.scene || viewer._scene || viewer.sceneGroup;
+    const camera = viewer.camera || viewer._camera;
+    if (!scene || !camera) {
+      notificar('El visor no expone escena para picking', 'warn');
+      return;
+    }
+    const canvas = DOM.viewerContainer.querySelector('canvas');
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    );
+    const ray = new THREE.Raycaster();
+    ray.params.Line = ray.params.Line || {};
+    ray.params.Line.threshold = 8;
+    ray.params.Points = ray.params.Points || {};
+    ray.params.Points.threshold = 8;
+    ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(scene.children, true);
+    if (hits.length === 0) {
+      notificar('No se encontró ningún objeto aquí', 'warn');
+      return;
+    }
+
+    // Buscar el nombre de capa subiendo por la jerarquía
+    let obj = hits[0].object;
+    let layerName = null;
+    while (obj && !layerName) {
+      const ud = obj.userData;
+      if (ud) {
+        layerName =
+          (ud.layer && (ud.layer.name || ud.layer)) ||
+          ud.Layer ||
+          ud.layerName ||
+          ud.LAYER;
+        if (layerName && typeof layerName !== 'string') {
+          layerName = layerName.name || null;
+        }
+      }
+      obj = obj.parent;
+    }
+    if (!layerName) {
+      notificar('No se pudo identificar la capa del objeto', 'warn');
+      return;
+    }
+    ocultarCapaPorNombre(layerName);
+  } catch (err) {
+    console.warn('click-hide error:', err);
+    notificar('Error al identificar el objeto', 'error');
+  }
+}
+
+function ocultarCapaPorNombre(name) {
+  const info = layersState.get(name);
+  if (!info) {
+    notificar(`Capa "${name}" no encontrada en el panel`, 'warn');
+    return;
+  }
+  if (!info.visible) {
+    notificar(`La capa "${name}" ya está oculta`, 'warn');
+    return;
+  }
+  info.visible = false;
+  setLayerVisible(name, false);
+  renderLayers();
+  notificar(`Capa ocultada: ${name}`);
+}
+
+/* ============================================================
+   COORDENADAS REALES EN LA BARRA INFERIOR
+   Mapeo lineal usando la extensión calculada del DXF.
 ============================================================ */
 DOM.viewerContainer.addEventListener('mousemove', (e) => {
-  if (!viewer) return;
-  const rect = DOM.viewerContainer.getBoundingClientRect();
-  const x = ((e.clientX - rect.left) / rect.width) * 100;
-  const y = ((e.clientY - rect.top) / rect.height) * 100;
+  if (!drawingBounds) return;
+  const canvas = DOM.viewerContainer.querySelector('canvas');
+  const ref = canvas || DOM.viewerContainer;
+  const rect = ref.getBoundingClientRect();
+  const nx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const ny = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
+  const x = drawingBounds.minX + nx * (drawingBounds.maxX - drawingBounds.minX);
+  const y = drawingBounds.minY + ny * (drawingBounds.maxY - drawingBounds.minY);
   DOM.statusCoords.style.display = '';
-  DOM.statusXY.textContent = `${x.toFixed(1)}% , ${y.toFixed(1)}%`;
+  DOM.statusX.textContent = `X: ${fmtNum(x)} m`;
+  DOM.statusY.textContent = `Y: ${fmtNum(y)} m`;
 });
 DOM.viewerContainer.addEventListener('mouseleave', () => {
   DOM.statusCoords.style.display = 'none';
@@ -916,6 +1188,20 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') {
     DOM.infoCard.classList.remove('activo');
+    if (clickHideMode) {
+      clickHideMode = false;
+      DOM.btnClickHide.classList.remove('active', 'active-danger');
+      DOM.canvasContainer.classList.remove('mode-clickhide');
+    }
+  }
+  if (e.key.toLowerCase() === 'g' && !e.ctrlKey && !e.metaKey) {
+    gridVisible = !gridVisible; applyGrid();
+  }
+  if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey) {
+    if (!DOM.btnClickHide.disabled) DOM.btnClickHide.click();
+  }
+  if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey) {
+    if (!DOM.btnFit.disabled) DOM.btnFit.click();
   }
 });
 </script>
