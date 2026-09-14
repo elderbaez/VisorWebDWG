@@ -193,6 +193,14 @@ body {
   font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--text-secondary);
 }
+.measure-header-actions { display: flex; align-items: center; gap: 0.35rem; }
+.measure-clear-btn {
+  background: transparent; border: none; color: var(--text-secondary);
+  cursor: pointer; font-size: 0.68rem; font-weight: 700; padding: 3px 7px;
+  border-radius: 5px; text-transform: uppercase; letter-spacing: 0.04em;
+  font-family: var(--font); transition: var(--transition);
+}
+.measure-clear-btn:hover { background: var(--danger); color: #fff; }
 .measure-close {
   background: transparent; border: none; color: var(--text-secondary);
   cursor: pointer; font-size: 1.1rem; line-height: 1; width: 24px; height: 24px;
@@ -242,20 +250,47 @@ body {
 .measure-result .mr-hint { color: var(--text-dim); font-size: 0.7rem; font-weight: 500; }
 
 .snap-marker {
-  position: absolute; width: 14px; height: 14px;
+  position: absolute; width: 16px; height: 16px;
   border: 2px solid var(--warning); border-radius: 50%;
-  background: rgba(210,153,34,0.25); pointer-events: none;
+  background: rgba(210,153,34,0.2); pointer-events: none;
   z-index: 250; transform: translate(-50%, -50%);
-  transition: opacity 0.1s;
+  transition: opacity 0.08s, border-color 0.08s;
 }
 .snap-marker.oculto { opacity: 0; }
-
-.measure-point {
-  position: absolute; width: 8px; height: 8px;
-  border-radius: 50%; background: var(--accent);
-  border: 2px solid #fff; pointer-events: none;
-  z-index: 251; transform: translate(-50%, -50%);
+.snap-marker[data-type="endpoint"] { border-radius: 3px; }
+.snap-marker[data-type="midpoint"] { border-radius: 3px; transform: translate(-50%, -50%) rotate(45deg); }
+.snap-marker[data-type="quadrant"] { border-radius: 50%; border-style: dashed; }
+.snap-marker[data-type="nearest"] { border-color: var(--text-secondary); background: rgba(139,148,158,0.18); }
+.snap-marker[data-type="intersection"] { border-color: var(--danger); background: rgba(248,81,73,0.18); }
+.snap-marker[data-type="fictitious"] { border-color: var(--danger); background: rgba(248,81,73,0.1); border-style: dashed; }
+.snap-marker[data-type="perpendicular"] { border-color: var(--success); background: rgba(63,185,80,0.18); border-radius: 3px; }
+.snap-marker-label {
+  position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+  background: rgba(13,17,23,0.92); color: var(--text-main); font-size: 0.62rem;
+  font-weight: 700; padding: 1px 6px; border-radius: 4px; white-space: nowrap;
+  letter-spacing: 0.02em; border: 1px solid var(--border);
 }
+.snap-marker[data-type="midpoint"] .snap-marker-label { transform: translateX(-50%) rotate(-45deg); }
+
+.measure-history {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 132px; overflow-y: auto; border-top: 1px solid var(--border);
+  padding: 0.4rem 0.5rem;
+}
+.measure-history:empty { display: none; padding: 0; border-top: none; }
+.measure-hist-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0.4rem; border-radius: 6px; font-size: 0.72rem;
+  color: var(--text-secondary); transition: var(--transition);
+}
+.measure-hist-item:hover { background: rgba(255,255,255,0.04); color: var(--text-main); }
+.measure-hist-item .mh-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+.measure-hist-item .mh-value { flex: 1; font-weight: 600; color: var(--text-main); font-variant-numeric: tabular-nums; }
+.measure-hist-item .mh-del {
+  background: transparent; border: none; color: var(--text-dim); cursor: pointer;
+  font-size: 0.85rem; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.measure-hist-item .mh-del:hover { background: var(--danger); color: #fff; }
 
 .empty-state {
   position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -507,12 +542,15 @@ body {
         <canvas id="measure-overlay"></canvas>
         <div class="grid-overlay" id="gridOverlay"></div>
 
-        <div class="snap-marker oculto" id="snapMarker"></div>
+        <div class="snap-marker oculto" id="snapMarker"><span class="snap-marker-label" id="snapMarkerLabel"></span></div>
 
         <div class="measure-panel" id="measurePanel">
           <div class="measure-header">
             <span>Medición</span>
-            <button class="measure-close" id="btnMeasureClose">×</button>
+            <div class="measure-header-actions">
+              <button class="measure-clear-btn" id="btnMeasureClearHistory" title="Borrar historial de mediciones">Limpiar</button>
+              <button class="measure-close" id="btnMeasureClose">×</button>
+            </div>
           </div>
           <div class="measure-tools">
             <button class="measure-tool-btn active" data-tool="distance" id="btnToolDistance">
@@ -562,6 +600,7 @@ body {
           <div class="measure-result" id="measureResult">
             <span class="mr-hint">Elegí una herramienta y hacé clic sobre el dibujo.</span>
           </div>
+          <div class="measure-history" id="measureHistory"></div>
         </div>
 
         <div class="empty-state" id="emptyState">
@@ -694,7 +733,10 @@ const DOM = {
   measurePanel: document.getElementById('measurePanel'),
   btnMeasureClose: document.getElementById('btnMeasureClose'),
   measureResult: document.getElementById('measureResult'),
+  measureHistory: document.getElementById('measureHistory'),
+  btnMeasureClearHistory: document.getElementById('btnMeasureClearHistory'),
   snapMarker: document.getElementById('snapMarker'),
+  snapMarkerLabel: document.getElementById('snapMarkerLabel'),
   measureOverlay: document.getElementById('measure-overlay'),
   btnSidebarToggle: document.getElementById('btnSidebarToggle'),
   btnToggleAll: document.getElementById('btnToggleAll'),
@@ -752,7 +794,13 @@ let lastSnapPoint = null;
 let mouseScreen = { x: 0, y: 0 };
 let rawDxfText = '';
 let measureRedrawRAF = null;
-let snapPoints = []; // Puntos de snap precalculados
+
+// Mejoras de medición
+let snapPoints = [];      
+let lineSegments = [];    
+let measureHistory = [];  
+let measureHistorySeq = 0;
+const SNAP_LABELS = { endpoint: 'Extremo', midpoint: 'Medio', center: 'Centro', quadrant: 'Cuadrante', nearest: 'Cercano', intersection: 'Intersección', fictitious: 'Extensión', perpendicular: 'Perpendicular' };
 
 function fmtBytes(b) {
   if (b < 1024) return b + ' B';
@@ -1038,7 +1086,6 @@ function fitView() {
   setTimeout(() => drawMeasurePreview(), 50);
 }
 
-/* Zoom directo usando camera.zoom para cámaras ortográficas */
 function zoomAtScreenPoint(factor, clientX, clientY) {
   if (!viewer) return;
   const camera = viewer.GetCamera();
@@ -1226,76 +1273,170 @@ function projectScreenToWorld(clientX, clientY) {
 }
 
 /* ============================================================
-   PUNTOS DE SNAP EXTRAÍDOS DEL DXF (precalculados)
+   PUNTOS DE SNAP EXTRAÍDOS DEL DXF Y MEJORAS DE CÁLCULO
 ============================================================ */
-function buildSnapPointsFromDxf(dxfText) {
-  const entities = parseDxfLines(dxfText);
-  const points = [];
+function buildMeasureGeometry(dxfText) {
+  const result = { snapPoints: [], segments: [] };
   const seen = new Set();
-  const addPoint = (x, y, type) => {
+  const addSnap = (x, y, type) => {
     if (!isFinite(x) || !isFinite(y)) return;
     const key = `${Math.round(x * 1000)}_${Math.round(y * 1000)}_${type}`;
     if (seen.has(key)) return;
     seen.add(key);
-    points.push({ x, y, type });
+    result.snapPoints.push({ x, y, type });
   };
-  for (const ent of entities) {
-    const v = ent.values, type = ent.type;
-    if (type === 'LINE') {
+  const addSeg = (x1, y1, x2, y2) => {
+    if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) result.segments.push({ x1, y1, x2, y2 });
+  };
+
+  const lines = dxfText.split(/\r?\n/);
+  let i = 0, inEntities = false;
+  for (i = 0; i < lines.length; i++) {
+    const code = lines[i].trim();
+    const value = lines[i + 1] ? lines[i + 1].trim() : '';
+    if (code === '0' && value === 'SECTION') {
+      const sectionName = lines[i + 3] ? lines[i + 3].trim() : '';
+      if (sectionName === 'ENTITIES') { inEntities = true; i += 4; break; }
+    }
+  }
+  if (!inEntities) return result;
+
+  let cur = null;
+  let lwVerts = null, lwClosed = false, lwPendingX = null;
+  let inClassicPoly = false, classicVerts = null;
+
+  const flushPolyVerts = (verts, closed) => {
+    const n = verts.length;
+    if (n === 0) return;
+    for (let k = 0; k < n - 1; k++) {
+      const a = verts[k], b = verts[k + 1];
+      addSnap(a.x, a.y, 'endpoint');
+      addSeg(a.x, a.y, b.x, b.y);
+      addSnap((a.x + b.x) / 2, (a.y + b.y) / 2, 'midpoint');
+    }
+    addSnap(verts[n - 1].x, verts[n - 1].y, 'endpoint');
+    if (closed && n > 2) {
+      const a = verts[n - 1], b = verts[0];
+      addSeg(a.x, a.y, b.x, b.y);
+      addSnap((a.x + b.x) / 2, (a.y + b.y) / 2, 'midpoint');
+    }
+  };
+
+  const flushSimple = () => {
+    if (!cur) return;
+    const v = cur.values, t = cur.type;
+    if (t === 'LINE') {
       const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
       const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
-      if (isFinite(x1) && isFinite(y1)) addPoint(x1, y1, 'endpoint');
-      if (isFinite(x2) && isFinite(y2)) addPoint(x2, y2, 'endpoint');
+      addSnap(x1, y1, 'endpoint'); addSnap(x2, y2, 'endpoint');
       if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) {
-        addPoint((x1 + x2) / 2, (y1 + y2) / 2, 'midpoint');
+        addSeg(x1, y1, x2, y2);
+        addSnap((x1 + x2) / 2, (y1 + y2) / 2, 'midpoint');
       }
-    } else if (type === 'LWPOLYLINE' || type === 'POLYLINE') {
-      const xs = [], ys = [];
-      for (const key in v) {
-        if (key === '10') {
-          const x = parseFloat(v[key]); const y = parseFloat(v['20']);
-          if (isFinite(x) && isFinite(y)) { xs.push(x); ys.push(y); }
-        }
-      }
-      for (let k = 0; k < xs.length; k++) {
-        addPoint(xs[k], ys[k], 'endpoint');
-        if (k < xs.length - 1) addPoint((xs[k] + xs[k+1]) / 2, (ys[k] + ys[k+1]) / 2, 'midpoint');
-      }
-    } else if (type === 'CIRCLE') {
+    } else if (t === 'CIRCLE') {
       const cx = parseFloat(v['10']), cy = parseFloat(v['20']), r = parseFloat(v['40']);
       if (isFinite(cx) && isFinite(cy)) {
-        addPoint(cx, cy, 'center');
+        addSnap(cx, cy, 'center');
         if (isFinite(r)) {
-          addPoint(cx + r, cy, 'quadrant'); addPoint(cx - r, cy, 'quadrant');
-          addPoint(cx, cy + r, 'quadrant'); addPoint(cx, cy - r, 'quadrant');
+          addSnap(cx + r, cy, 'quadrant'); addSnap(cx - r, cy, 'quadrant');
+          addSnap(cx, cy + r, 'quadrant'); addSnap(cx, cy - r, 'quadrant');
+          const N = 48;
+          for (let k = 0; k < N; k++) {
+            const a1 = (k / N) * Math.PI * 2, a2 = ((k + 1) / N) * Math.PI * 2;
+            addSeg(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2));
+          }
         }
       }
-    } else if (type === 'ARC') {
+    } else if (t === 'ARC') {
       const cx = parseFloat(v['10']), cy = parseFloat(v['20']), r = parseFloat(v['40']);
       const sa = parseFloat(v['50'] || '0'), ea = parseFloat(v['51'] || '360');
       if (isFinite(cx) && isFinite(cy)) {
-        addPoint(cx, cy, 'center');
+        addSnap(cx, cy, 'center');
         if (isFinite(r)) {
           const a1 = sa * Math.PI / 180, a2 = ea * Math.PI / 180;
-          addPoint(cx + r * Math.cos(a1), cy + r * Math.sin(a1), 'endpoint');
-          addPoint(cx + r * Math.cos(a2), cy + r * Math.sin(a2), 'endpoint');
+          const sx = cx + r * Math.cos(a1), sy = cy + r * Math.sin(a1);
+          const ex = cx + r * Math.cos(a2), ey = cy + r * Math.sin(a2);
+          addSnap(sx, sy, 'endpoint'); addSnap(ex, ey, 'endpoint');
           const am = (a1 + a2) / 2;
-          addPoint(cx + r * Math.cos(am), cy + r * Math.sin(am), 'midpoint');
+          addSnap(cx + r * Math.cos(am), cy + r * Math.sin(am), 'midpoint');
+          const N = 24;
+          for (let k = 0; k < N; k++) {
+            const t1 = a1 + (k / N) * (a2 - a1), t2 = a1 + ((k + 1) / N) * (a2 - a1);
+            addSeg(cx + r * Math.cos(t1), cy + r * Math.sin(t1), cx + r * Math.cos(t2), cy + r * Math.sin(t2));
+          }
         }
       }
-    } else if (type === 'POINT') {
+    } else if (t === 'POINT') {
       const x = parseFloat(v['10']), y = parseFloat(v['20']);
-      if (isFinite(x) && isFinite(y)) addPoint(x, y, 'endpoint');
+      addSnap(x, y, 'endpoint');
+    } else if (t === 'POLYLINE_HDR') {
+      lwClosed = (parseInt(v['70'] || '0', 10) & 1) === 1;
+    } else if (t === 'VERTEX' && classicVerts) {
+      const x = parseFloat(v['10']), y = parseFloat(v['20']);
+      if (isFinite(x) && isFinite(y)) classicVerts.push({ x, y });
     }
+    cur = null;
+  };
+
+  for (; i < lines.length - 1; i += 2) {
+    const code = lines[i].trim(), value = lines[i + 1].trim();
+    if (code === '0') {
+      if (lwVerts) { flushPolyVerts(lwVerts, lwClosed); lwVerts = null; lwClosed = false; lwPendingX = null; }
+      if (cur) flushSimple();
+      if (value === 'ENDSEC') {
+        if (classicVerts) { flushPolyVerts(classicVerts, lwClosed); classicVerts = null; }
+        break;
+      }
+      if (value === 'LWPOLYLINE') { lwVerts = []; lwClosed = false; lwPendingX = null; continue; }
+      if (value === 'POLYLINE') { inClassicPoly = true; classicVerts = []; lwClosed = false; cur = { type: 'POLYLINE_HDR', values: {} }; continue; }
+      if (value === 'VERTEX' && inClassicPoly) { cur = { type: 'VERTEX', values: {} }; continue; }
+      if (value === 'SEQEND') {
+        inClassicPoly = false;
+        if (classicVerts) { flushPolyVerts(classicVerts, lwClosed); classicVerts = null; }
+        continue;
+      }
+      cur = { type: value, values: {} };
+      continue;
+    }
+    if (lwVerts !== null) {
+      if (code === '70') lwClosed = (parseInt(value, 10) & 1) === 1;
+      else if (code === '10') lwPendingX = parseFloat(value);
+      else if (code === '20') {
+        const y = parseFloat(value);
+        if (isFinite(lwPendingX) && isFinite(y)) lwVerts.push({ x: lwPendingX, y });
+        lwPendingX = null;
+      }
+      continue;
+    }
+    if (cur) cur.values[code] = value;
   }
-  return points;
+  return result;
 }
 
-/* ============================================================
-   SNAPPING USANDO PUNTOS PRECALCULADOS
-============================================================ */
+function pixelsToWorldUnits(px, clientX, clientY) {
+  const p0 = projectScreenToWorld(clientX, clientY);
+  const p1 = projectScreenToWorld(clientX + 10, clientY);
+  if (!p0 || !p1) return px;
+  const upp = Math.hypot(p1.x - p0.x, p1.y - p0.y) / 10;
+  return px * (upp || 0.001);
+}
+function pointToSegDistWorld(px, py, seg) {
+  const dx = seg.x2 - seg.x1, dy = seg.y2 - seg.y1;
+  const lenSq = dx * dx + dy * dy;
+  let t = lenSq > 1e-12 ? ((px - seg.x1) * dx + (py - seg.y1) * dy) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = seg.x1 + t * dx, cy = seg.y1 + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+function pointToInfiniteLineDist(px, py, seg) {
+  const dx = seg.x2 - seg.x1, dy = seg.y2 - seg.y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-9) return Math.hypot(px - seg.x1, py - seg.y1);
+  return Math.abs((px - seg.x1) * dy - (py - seg.y1) * dx) / len;
+}
+
 function findSnapPoint(clientX, clientY, threshold = 14) {
-  if (!viewer || snapPoints.length === 0) return null;
+  if (!viewer) return null;
   const camera = viewer.GetCamera();
   const canvas = viewer.GetCanvas();
   if (!camera || !canvas) return null;
@@ -1304,8 +1445,8 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
   const clickY = clientY - rect.top;
   const thresh2 = threshold * threshold;
 
+  // 1) Snaps geométricos exactos
   let best = null, bestDist2 = thresh2;
-
   for (const pt of snapPoints) {
     let tipoActivo = false;
     switch (pt.type) {
@@ -1313,7 +1454,6 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
       case 'midpoint': tipoActivo = measureSnaps.has('midpoint'); break;
       case 'center': tipoActivo = measureSnaps.has('center'); break;
       case 'quadrant': tipoActivo = measureSnaps.has('quadrant'); break;
-      default: tipoActivo = measureSnaps.has('nearest');
     }
     if (!tipoActivo) continue;
     const sp = projectWorldToScreen(pt.x, pt.y, camera, rect);
@@ -1324,113 +1464,135 @@ function findSnapPoint(clientX, clientY, threshold = 14) {
       best = { x: pt.x, y: pt.y, z: 0, screenX: sp.x, screenY: sp.y, type: pt.type };
     }
   }
+  if (best) return best;
 
-  // Snap "nearest": punto sobre segmento más cercano
-  if (measureSnaps.has('nearest') && !best) {
-    const nearest = findNearestOnSegments(clientX, clientY, threshold);
-    if (nearest) best = nearest;
+  // 2) Perpendicular
+  if (measureSnaps.has('perpendicular')) {
+    const pp = findPerpendicularSnap(clientX, clientY, threshold);
+    if (pp) return pp;
   }
-  // Intersecciones
-  if (measureSnaps.has('intersection') && !best) {
+  // 3) Intersección
+  if (measureSnaps.has('intersection')) {
     const ix = findIntersectionNear(clientX, clientY, threshold);
-    if (ix) best = ix;
+    if (ix) return ix;
   }
-  // Intersección ficticia
-  if (measureSnaps.has('fictitious') && !best) {
+  // 4) Intersección ficticia (extensión)
+  if (measureSnaps.has('fictitious')) {
     const fx = findFictitiousIntersection(clientX, clientY, threshold);
-    if (fx) best = fx;
+    if (fx) return fx;
+  }
+  // 5) Cercano (sobre segmento)
+  if (measureSnaps.has('nearest')) {
+    const nr = findNearestOnSegments(clientX, clientY, threshold);
+    if (nr) return nr;
+  }
+  return null;
+}
+
+function findNearestOnSegments(clientX, clientY, threshold) {
+  if (!viewer || lineSegments.length === 0) return null;
+  const camera = viewer.GetCamera(), canvas = viewer.GetCanvas();
+  if (!camera || !canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  const clickX = clientX - rect.left, clickY = clientY - rect.top;
+  let best = null, bestDist2 = threshold * threshold;
+  for (const seg of lineSegments) {
+    const p1 = projectWorldToScreen(seg.x1, seg.y1, camera, rect);
+    const p2 = projectWorldToScreen(seg.x2, seg.y2, camera, rect);
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const lenSq = dx * dx + dy * dy;
+    let t = lenSq > 1e-9 ? ((clickX - p1.x) * dx + (clickY - p1.y) * dy) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const sx = p1.x + t * dx, sy = p1.y + t * dy;
+    const d2 = (clickX - sx) ** 2 + (clickY - sy) ** 2;
+    if (d2 < bestDist2) {
+      bestDist2 = d2;
+      best = { x: seg.x1 + t * (seg.x2 - seg.x1), y: seg.y1 + t * (seg.y2 - seg.y1), z: 0, screenX: sx, screenY: sy, type: 'nearest' };
+    }
   }
   return best;
 }
 
-function findNearestOnSegments(clientX, clientY, threshold) {
-  const camera = viewer.GetCamera();
-  const canvas = viewer.GetCanvas();
+function findPerpendicularSnap(clientX, clientY, threshold) {
+  if (!viewer || lineSegments.length === 0 || measurePoints.length === 0) return null;
+  const ref = measurePoints[measurePoints.length - 1];
+  const camera = viewer.GetCamera(), canvas = viewer.GetCanvas();
+  if (!camera || !canvas) return null;
   const rect = canvas.getBoundingClientRect();
   const clickX = clientX - rect.left, clickY = clientY - rect.top;
   let best = null, bestDist2 = threshold * threshold;
-  const entities = parseDxfLines(rawDxfText);
-  for (const ent of entities) {
-    const v = ent.values;
-    if (ent.type === 'LINE') {
-      const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
-      const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
-      if (!isFinite(x1) || !isFinite(x2)) continue;
-      const p1 = projectWorldToScreen(x1, y1, camera, rect);
-      const p2 = projectWorldToScreen(x2, y2, camera, rect);
-      const dx = p2.x - p1.x, dy = p2.y - p1.y;
-      const lenSq = dx * dx + dy * dy;
-      let t = lenSq > 1e-9 ? ((clickX - p1.x) * dx + (clickY - p1.y) * dy) / lenSq : 0;
-      t = Math.max(0, Math.min(1, t));
-      const sx = p1.x + t * dx, sy = p1.y + t * dy;
-      const d2 = (clickX - sx) ** 2 + (clickY - sy) ** 2;
-      if (d2 < bestDist2) {
-        bestDist2 = d2;
-        best = { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1), z: 0, screenX: sx, screenY: sy, type: 'nearest' };
-      }
-    }
+  const margin = 0.05;
+  for (const seg of lineSegments) {
+    const dx = seg.x2 - seg.x1, dy = seg.y2 - seg.y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq < 1e-12) continue;
+    const t = ((ref.x - seg.x1) * dx + (ref.y - seg.y1) * dy) / lenSq;
+    if (t < -margin || t > 1 + margin) continue;
+    const fx = seg.x1 + t * dx, fy = seg.y1 + t * dy;
+    const sp = projectWorldToScreen(fx, fy, camera, rect);
+    const d2 = (sp.x - clickX) ** 2 + (sp.y - clickY) ** 2;
+    if (d2 < bestDist2) { bestDist2 = d2; best = { x: fx, y: fy, z: 0, screenX: sp.x, screenY: sp.y, type: 'perpendicular' }; }
   }
   return best;
 }
 
 function findIntersectionNear(clientX, clientY, threshold) {
-  const camera = viewer.GetCamera();
-  const canvas = viewer.GetCanvas();
+  if (!viewer || lineSegments.length < 2) return null;
+  const camera = viewer.GetCamera(), canvas = viewer.GetCanvas();
+  if (!camera || !canvas) return null;
   const rect = canvas.getBoundingClientRect();
   const clickX = clientX - rect.left, clickY = clientY - rect.top;
-  const entities = parseDxfLines(rawDxfText);
-  const lines = [];
-  for (const ent of entities) {
-    const v = ent.values;
-    if (ent.type === 'LINE') {
-      const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
-      const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
-      if (isFinite(x1) && isFinite(x2)) lines.push({ x1, y1, x2, y2 });
-    }
+  const cursorWorld = projectScreenToWorld(clientX, clientY);
+  if (!cursorWorld) return null;
+  
+  const worldRadius = pixelsToWorldUnits(threshold * 4, clientX, clientY);
+  const candidates = [];
+  for (const seg of lineSegments) {
+    if (pointToSegDistWorld(cursorWorld.x, cursorWorld.y, seg) <= worldRadius) candidates.push(seg);
   }
+  if (candidates.length < 2) return null;
   let best = null, bestDist2 = threshold * threshold;
-  for (let i = 0; i < lines.length; i++) {
-    for (let j = i + 1; j < lines.length; j++) {
-      const a = lines[i], b = lines[j];
-      const ix = segIntersectWorld({ x: a.x1, y: a.y1 }, { x: a.x2, y: a.y2 }, { x: b.x1, y: b.y1 }, { x: b.x2, y: b.y2 });
-      if (ix) {
-        const sp = projectWorldToScreen(ix.x, ix.y, camera, rect);
-        const d2 = (sp.x - clickX) ** 2 + (sp.y - clickY) ** 2;
-        if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: sp.x, screenY: sp.y, type: 'intersection' }; }
-      }
+  for (let a = 0; a < candidates.length; a++) {
+    for (let b = a + 1; b < candidates.length; b++) {
+      const sA = candidates[a], sB = candidates[b];
+      const ix = segIntersectWorld({ x: sA.x1, y: sA.y1 }, { x: sA.x2, y: sA.y2 }, { x: sB.x1, y: sB.y1 }, { x: sB.x2, y: sB.y2 });
+      if (!ix) continue;
+      const sp = projectWorldToScreen(ix.x, ix.y, camera, rect);
+      const d2 = (sp.x - clickX) ** 2 + (sp.y - clickY) ** 2;
+      if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: sp.x, screenY: sp.y, type: 'intersection' }; }
     }
   }
   return best;
 }
 
 function findFictitiousIntersection(clientX, clientY, threshold) {
-  const camera = viewer.GetCamera();
-  const canvas = viewer.GetCanvas();
+  if (!viewer || lineSegments.length < 2) return null;
+  const camera = viewer.GetCamera(), canvas = viewer.GetCanvas();
+  if (!camera || !canvas) return null;
   const rect = canvas.getBoundingClientRect();
   const clickX = clientX - rect.left, clickY = clientY - rect.top;
-  const entities = parseDxfLines(rawDxfText);
-  const lines = [];
-  for (const ent of entities) {
-    const v = ent.values;
-    if (ent.type === 'LINE') {
-      const x1 = parseFloat(v['10']), y1 = parseFloat(v['20']);
-      const x2 = parseFloat(v['11']), y2 = parseFloat(v['21']);
-      if (isFinite(x1) && isFinite(x2)) lines.push({ x1, y1, x2, y2 });
-    }
+  const cursorWorld = projectScreenToWorld(clientX, clientY);
+  if (!cursorWorld) return null;
+  
+  const worldRadius = pixelsToWorldUnits(threshold * 6, clientX, clientY);
+  const candidates = [];
+  for (const seg of lineSegments) {
+    if (pointToInfiniteLineDist(cursorWorld.x, cursorWorld.y, seg) <= worldRadius) candidates.push(seg);
   }
+  if (candidates.length < 2) return null;
   let best = null, bestDist2 = threshold * threshold;
   const margin = 2.0;
-  for (let i = 0; i < lines.length; i++) {
-    for (let j = i + 1; j < lines.length; j++) {
-      const a = lines[i], b = lines[j];
-      const d1x = a.x2 - a.x1, d1y = a.y2 - a.y1;
-      const d2x = b.x2 - b.x1, d2y = b.y2 - b.y1;
+  for (let a = 0; a < candidates.length; a++) {
+    for (let b = a + 1; b < candidates.length; b++) {
+      const sA = candidates[a], sB = candidates[b];
+      const d1x = sA.x2 - sA.x1, d1y = sA.y2 - sA.y1;
+      const d2x = sB.x2 - sB.x1, d2y = sB.y2 - sB.y1;
       const denom = d1x * d2y - d1y * d2x;
       if (Math.abs(denom) < 1e-12) continue;
-      const t = ((b.x1 - a.x1) * d2y - (b.y1 - a.y1) * d2x) / denom;
-      const u = ((b.x1 - a.x1) * d1y - (b.y1 - a.y1) * d1x) / denom;
+      const t = ((sB.x1 - sA.x1) * d2y - (sB.y1 - sA.y1) * d2x) / denom;
+      const u = ((sB.x1 - sA.x1) * d1y - (sB.y1 - sA.y1) * d1x) / denom;
       if (t < -margin || t > 1 + margin || u < -margin || u > 1 + margin) continue;
-      const ix = { x: a.x1 + t * d1x, y: a.y1 + t * d1y };
+      const ix = { x: sA.x1 + t * d1x, y: sA.y1 + t * d1y };
       const sp = projectWorldToScreen(ix.x, ix.y, camera, rect);
       const d2 = (sp.x - clickX) ** 2 + (sp.y - clickY) ** 2;
       if (d2 < bestDist2) { bestDist2 = d2; best = { x: ix.x, y: ix.y, z: 0, screenX: sp.x, screenY: sp.y, type: 'fictitious' }; }
@@ -1451,7 +1613,7 @@ function segIntersectWorld(a1, a2, b1, b2) {
 }
 
 /* ============================================================
-   OVERLAY DE MEDICIÓN
+   OVERLAY DE MEDICIÓN & HISTORIAL
 ============================================================ */
 function getOverlayCtx() {
   const c = DOM.measureOverlay;
@@ -1471,42 +1633,134 @@ function getOverlayCtx() {
 
 function drawMeasurePreview() {
   const { ctx, w, h } = getOverlayCtx();
+  const camera = viewer?.GetCamera();
+  const rect = DOM.canvasContainer.getBoundingClientRect();
+  if (!camera) return;
+
+  const proj = (wp) => projectWorldToScreen(wp.x, wp.y, camera, rect);
+
+  // 1. Dibujar el Historial de mediciones ya confirmadas
+  measureHistory.forEach(item => {
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(63, 185, 80, 0.85)';
+    ctx.fillStyle = 'rgba(63, 185, 80, 0.15)';
+    ctx.setLineDash([]);
+
+    const pts = item.points.map(proj);
+    if (pts.length === 0) return;
+
+    if (item.tool === 'distance' && pts.length === 2) {
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(pts[1].x, pts[1].y); ctx.stroke();
+    } else if (item.tool === 'polyline' && pts.length >= 2) {
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+      for(let i=1; i<pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+    } else if (item.tool === 'area' && pts.length >= 3) {
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+      for(let i=1; i<pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (item.tool === 'angle' && pts.length === 3) {
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(pts[1].x, pts[1].y); ctx.lineTo(pts[2].x, pts[2].y); ctx.stroke();
+    }
+
+    // Vértices del historial
+    pts.forEach(p => {
+      if(!p) return;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+      ctx.fillStyle = '#3fb950'; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+    });
+  });
+
   if (!measureMode || measurePoints.length === 0) return;
+
+  // 2. Dibujar la medición activa en proceso
   const pts = measurePoints;
   const last = pts[pts.length - 1];
   let curX, curY;
   if (lastSnapPoint) { curX = lastSnapPoint.screenX; curY = lastSnapPoint.screenY; }
-  else { const rect = DOM.canvasContainer.getBoundingClientRect(); curX = mouseScreen.x - rect.left; curY = mouseScreen.y - rect.top; }
-  ctx.lineWidth = 2; ctx.strokeStyle = '#2f81f7'; ctx.fillStyle = '#2f81f7';
+  else { curX = mouseScreen.x - rect.left; curY = mouseScreen.y - rect.top; }
+
+  ctx.lineWidth = 2; ctx.strokeStyle = '#2f81f7'; ctx.fillStyle = 'rgba(47, 129, 247, 0.12)';
   ctx.setLineDash([6, 4]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
   if (measureTool === 'distance') {
-    const p0 = pts[0];
-    if (p0._sx !== undefined) { ctx.beginPath(); ctx.moveTo(p0._sx, p0._sy); ctx.lineTo(curX, curY); ctx.stroke(); }
+    const p0 = proj(pts[0]);
+    if (p0) { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(curX, curY); ctx.stroke(); }
   } else if (measureTool === 'polyline') {
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i], b = pts[i+1];
-      if (a._sx !== undefined && b._sx !== undefined) { ctx.beginPath(); ctx.moveTo(a._sx, a._sy); ctx.lineTo(b._sx, b._sy); ctx.stroke(); }
+    ctx.beginPath();
+    const p0 = proj(pts[0]);
+    if(p0) ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < pts.length; i++) {
+      const p = proj(pts[i]);
+      if(p) ctx.lineTo(p.x, p.y);
     }
-    if (last._sx !== undefined) { ctx.beginPath(); ctx.moveTo(last._sx, last._sy); ctx.lineTo(curX, curY); ctx.stroke(); }
+    ctx.lineTo(curX, curY); ctx.stroke();
   } else if (measureTool === 'area') {
     if (pts.length >= 2) {
-      ctx.beginPath(); ctx.moveTo(pts[0]._sx, pts[0]._sy);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]._sx, pts[i]._sy);
+      ctx.beginPath();
+      const p0 = proj(pts[0]);
+      if(p0) ctx.moveTo(p0.x, p0.y);
+      for (let i = 1; i < pts.length; i++) {
+        const p = proj(pts[i]);
+        if(p) ctx.lineTo(p.x, p.y);
+      }
       ctx.lineTo(curX, curY); ctx.closePath();
-      ctx.fillStyle = 'rgba(47, 129, 247, 0.12)'; ctx.fill();
-      ctx.strokeStyle = '#2f81f7'; ctx.stroke();
+      ctx.fill(); ctx.stroke();
     }
   } else if (measureTool === 'angle') {
     if (pts.length === 1) {
-      const p0 = pts[0];
-      if (p0._sx !== undefined) { ctx.beginPath(); ctx.moveTo(p0._sx, p0._sy); ctx.lineTo(curX, curY); ctx.stroke(); }
+      const p0 = proj(pts[0]);
+      if (p0) { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(curX, curY); ctx.stroke(); }
     } else if (pts.length >= 2) {
-      const p0 = pts[0], p1 = pts[1];
-      if (p0._sx !== undefined && p1._sx !== undefined) { ctx.beginPath(); ctx.moveTo(p0._sx, p0._sy); ctx.lineTo(p1._sx, p1._sy); ctx.lineTo(curX, curY); ctx.stroke(); }
+      const p0 = proj(pts[0]), p1 = proj(pts[1]);
+      if (p0 && p1) { ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(curX, curY); ctx.stroke(); }
     }
   }
+
   ctx.setLineDash([]);
+  
+  // Vértices activos
+  pts.forEach(wp => {
+    const p = proj(wp);
+    if(p) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+      ctx.fillStyle = '#2f81f7'; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+    }
+  });
 }
+
+function renderMeasureHistoryList() {
+  const container = DOM.measureHistory;
+  container.innerHTML = '';
+  if (measureHistory.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'flex';
+  measureHistory.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'measure-hist-item';
+    el.innerHTML = `
+      <div class="mh-dot"></div>
+      <div class="mh-value">${item.tool.toUpperCase()}: ${item.value}</div>
+      <button class="mh-del" title="Eliminar">×</button>
+    `;
+    el.querySelector('.mh-del').addEventListener('click', () => {
+      measureHistory = measureHistory.filter(x => x.id !== item.id);
+      renderMeasureHistoryList();
+      drawMeasurePreview();
+    });
+    container.appendChild(el);
+  });
+}
+
+DOM.btnMeasureClearHistory.addEventListener('click', () => {
+  measureHistory = [];
+  renderMeasureHistoryList();
+  drawMeasurePreview();
+});
 
 function enterMeasureMode() {
   if (clickHideMode) { clickHideMode = false; DOM.btnClickHide.classList.remove('active', 'active-danger'); DOM.canvasContainer.classList.remove('mode-clickhide'); }
@@ -1530,10 +1784,10 @@ function exitMeasureMode() {
 }
 function clearMeasure() {
   measurePoints = []; lastSnapPoint = null;
-  document.querySelectorAll('.measure-point').forEach(el => el.remove());
   DOM.snapMarker.classList.add('oculto');
   drawMeasurePreview();
 }
+
 DOM.btnMeasure.addEventListener('click', () => { if (measureMode) exitMeasureMode(); else enterMeasureMode(); });
 DOM.btnMeasureClose.addEventListener('click', () => exitMeasureMode());
 
@@ -1567,38 +1821,78 @@ DOM.viewerContainer.addEventListener('mousemove', (e) => {
   mouseScreen = { x: e.clientX, y: e.clientY };
   if (!measureMode) return;
   const snap = findSnapPoint(e.clientX, e.clientY);
-  if (snap) { lastSnapPoint = snap; DOM.snapMarker.classList.remove('oculto'); DOM.snapMarker.style.left = snap.screenX + 'px'; DOM.snapMarker.style.top = snap.screenY + 'px'; }
-  else { lastSnapPoint = null; DOM.snapMarker.classList.add('oculto'); }
+  if (snap) {
+    lastSnapPoint = snap;
+    DOM.snapMarker.classList.remove('oculto');
+    DOM.snapMarker.style.left = snap.screenX + 'px';
+    DOM.snapMarker.style.top = snap.screenY + 'px';
+    DOM.snapMarker.setAttribute('data-type', snap.type);
+    DOM.snapMarkerLabel.textContent = SNAP_LABELS[snap.type] || snap.type;
+  } else {
+    lastSnapPoint = null;
+    DOM.snapMarker.classList.add('oculto');
+  }
   drawMeasurePreview();
   if (measurePoints.length > 0) updateMeasureResultLive();
 });
+
+function finishCurrentMeasurement() {
+  const valSpan = DOM.measureResult.querySelector('.mr-value');
+  const valText = valSpan ? valSpan.textContent : 'Hecho';
+  measureHistory.push({
+    id: ++measureHistorySeq,
+    tool: measureTool,
+    points: [...measurePoints],
+    value: valText
+  });
+  renderMeasureHistoryList();
+  
+  // Limpiamos los puntos activos
+  measurePoints = [];
+  lastSnapPoint = null;
+  DOM.snapMarker.classList.add('oculto');
+  drawMeasurePreview();
+}
 
 DOM.viewerContainer.addEventListener('click', (e) => {
   if (!measureMode) return;
   e.stopPropagation(); e.preventDefault();
   const snap = findSnapPoint(e.clientX, e.clientY);
-  let worldPoint, screenX, screenY;
-  if (snap) { worldPoint = { x: snap.x, y: snap.y, z: 0 }; screenX = snap.screenX; screenY = snap.screenY; }
+  let worldPoint;
+  if (snap) { worldPoint = { x: snap.x, y: snap.y, z: 0 }; }
   else {
     const wp = projectScreenToWorld(e.clientX, e.clientY);
     if (!wp) return;
     worldPoint = wp;
-    const cRect = DOM.canvasContainer.getBoundingClientRect();
-    screenX = e.clientX - cRect.left; screenY = e.clientY - cRect.top;
   }
-  worldPoint._sx = screenX; worldPoint._sy = screenY;
   measurePoints.push(worldPoint);
-  addMeasurePointVisual(screenX, screenY);
   updateMeasureResult();
-  drawMeasurePreview();
+  
+  if (measureTool === 'distance' && measurePoints.length === 2) {
+    finishCurrentMeasurement();
+  } else if (measureTool === 'angle' && measurePoints.length === 3) {
+    finishCurrentMeasurement();
+  } else {
+    drawMeasurePreview();
+  }
 }, true);
 
-function addMeasurePointVisual(sx, sy) {
-  const el = document.createElement('div');
-  el.className = 'measure-point';
-  el.style.left = sx + 'px'; el.style.top = sy + 'px';
-  DOM.canvasContainer.appendChild(el);
-}
+DOM.viewerContainer.addEventListener('dblclick', (e) => {
+  if (!measureMode) return;
+  if (measureTool === 'polyline' || measureTool === 'area') {
+    e.stopPropagation(); e.preventDefault();
+    // Remover punto duplicado generado por el dblclick
+    if (measurePoints.length > 2) {
+       const p1 = measurePoints[measurePoints.length - 1];
+       const p2 = measurePoints[measurePoints.length - 2];
+       if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1e-9) {
+           measurePoints.pop();
+       }
+    }
+    updateMeasureResult();
+    finishCurrentMeasurement();
+  }
+});
 
 function updateMeasureResult() {
   const n = measurePoints.length;
@@ -1675,11 +1969,6 @@ function updateMeasureResultLive() {
 }
 
 function dist2d(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); }
-
-DOM.viewerContainer.addEventListener('dblclick', (e) => {
-  if (!measureMode) return;
-  if (measureTool === 'polyline' || measureTool === 'area') { e.stopPropagation(); e.preventDefault(); updateMeasureResult(); }
-});
 
 DOM.btnClickHide.addEventListener('click', () => {
   if (DOM.btnClickHide.disabled) return;
@@ -1776,7 +2065,6 @@ async function getJsPDF() {
   });
 }
 
-/* Importación dinámica de svg2pdf.js como módulo ESM */
 let svg2pdfFn = null;
 async function getSvg2Pdf() {
   if (svg2pdfFn) return svg2pdfFn;
@@ -1978,7 +2266,15 @@ async function processFile(file) {
       dxfText = await file.text();
     }
     rawDxfText = dxfText;
-    snapPoints = buildSnapPointsFromDxf(dxfText);
+    
+    // Inicializar geometría y motor para las mediciones robustas
+    const measureGeo = buildMeasureGeometry(dxfText);
+    snapPoints = measureGeo.snapPoints;
+    lineSegments = measureGeo.segments;
+    measureHistory = [];
+    measureHistorySeq = 0;
+    renderMeasureHistoryList();
+    if (measureMode) exitMeasureMode();
 
     DOM.loadingLabel.textContent = 'Cargando tipografías…';
     fonts = await getFonts();
