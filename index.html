@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#1b1b1b">
 <title>Visor web DWG/DXF</title>
 
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%231b1b1b'/%3E%3Cpath d='M256 64l192 192-192 192L64 256z' fill='%232f81f7'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%231b1b1b'/%3E%3Cpath d='M256 64l192 192-192 192L64 256z' fill='%232f81f7'/%3E%3C/svg%3E">
 
@@ -3052,7 +3052,7 @@ window.addEventListener('resize', () => {
 // Service Worker para PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    navigator.serviceWorker.register('./sw.js')
       .then((registration) => {
         console.log('Service Worker registrado:', registration.scope);
       })
