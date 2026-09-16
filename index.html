@@ -3060,6 +3060,31 @@ if ('serviceWorker' in navigator) {
         console.log('Error al registrar Service Worker:', error);
       });
   });
+
+  // File Handling API - Abrir archivos DWG/DXF directamente desde el sistema
+  if ('launchQueue' in window) {
+    window.launchQueue.setConsumer(async (launchParams) => {
+      if (!launchParams.files || !launchParams.files.length) return;
+
+      const fileHandle = launchParams.files[0];
+      try {
+        const fileData = await fileHandle.getFile();
+        const arrayBuffer = await fileData.arrayBuffer();
+        const fileName = fileData.name;
+
+        // Usar la función processFile existente para cargar el archivo
+        if (typeof processFile === 'function') {
+          // Crear un objeto File desde el arrayBuffer
+          const file = new File([arrayBuffer], fileName, { type: fileData.type });
+          await processFile(file);
+        } else {
+          console.warn('No se encontró la función processFile');
+        }
+      } catch (err) {
+        console.error('Error al leer el archivo desde launchQueue:', err);
+      }
+    });
+  }
 }
 </script>
 </body>
