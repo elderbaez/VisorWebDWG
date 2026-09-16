@@ -26,8 +26,9 @@
     {
       "action": "./index.html",
       "accept": {
+        "application/acad": [".dwg"],
         "application/dxf": [".dxf"],
-        "application/dwg": [".dwg"]
+        "application/octet-stream": [".dwg", ".dxf"]
       }
     }
   ]
