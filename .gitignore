@@ -23,6 +23,14 @@ target/
 .pytest_cache/
 
 # Editors and IDEs
+# Environment and temporary files
+.env
+.env.local
+*.env.*
+*.tmp
+*.log
+
+# Editor/IDE files
 .vscode/
 .idea/
 *.swp
@@ -38,6 +46,35 @@ Thumbs.db
 
 # Logs and coverage
 *.log
+
+# Dependency directories
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
+target/
+.gradle/
+
+# Compiled files
+*.pyc
+*.class
+*.o
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
 coverage/
 htmlcov/
 .coverage
@@ -65,4 +102,3 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
